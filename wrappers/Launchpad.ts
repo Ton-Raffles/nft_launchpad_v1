@@ -1,9 +1,17 @@
 import { Address, beginCell, Cell, Contract, contractAddress, ContractProvider, Sender, SendMode } from 'ton-core';
 
-export type LaunchpadConfig = {};
+export type LaunchpadConfig = {
+    adminPubkey: Buffer;
+    available: bigint;
+    price: bigint;
+};
 
 export function launchpadConfigToCell(config: LaunchpadConfig): Cell {
-    return beginCell().endCell();
+    return beginCell()
+        .storeBuffer(config.adminPubkey, 64)
+        .storeUint(config.available, 32)
+        .storeCoins(config.price)
+        .endCell();
 }
 
 export class Launchpad implements Contract {
@@ -24,6 +32,28 @@ export class Launchpad implements Contract {
             value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
             body: beginCell().endCell(),
+        });
+    }
+
+    async sendPurchase(
+        provider: ContractProvider,
+        via: Sender,
+        value: bigint,
+        signature: Buffer,
+        queryId: bigint,
+        user: Address,
+        quantity: bigint
+    ) {
+        await provider.internal(via, {
+            value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell()
+                .storeUint(0x4c56b6b5, 32)
+                .storeBuffer(signature, 64)
+                .storeUint(queryId, 64)
+                .storeAddress(user)
+                .storeUint(quantity, 8)
+                .endCell(),
         });
     }
 }
