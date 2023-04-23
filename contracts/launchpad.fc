@@ -3,11 +3,16 @@
 global int admin_pubkey;
 global int available;
 global int price;
+global int last_index;
+global slice collection;
+
+global int query_id;
 global slice sender;
 
 const int op::purchase = 0x4c56b6b5;
 
 const int const::fees = 50000000;
+const int const::deploy_value = 50000000;
 
 const int error::invalid_signature = 701;
 const int error::wrong_sender = 702;
@@ -18,6 +23,8 @@ const int error::not_enough_value = 703;
     admin_pubkey = ds~load_uint(256);
     available = ds~load_uint(32);
     price = ds~load_coins();
+    last_index = ds~load_uint(32);
+    collection = ds~load_msg_addr();
 }
 
 () save_data() impure {
@@ -25,18 +32,53 @@ const int error::not_enough_value = 703;
         .store_uint(admin_pubkey, 256)
         .store_uint(available, 32)
         .store_coins(price)
+        .store_uint(last_index, 32)
+        .store_slice(collection)
     .end_cell());
 }
 
+(builder) store_int_as_string(builder b, int x) asm """
+    ZERO
+    SWAP
+    UNTIL:<{
+        10 PUSHINT DIVMOD
+        48 ADDCONST
+        s3 s1 s3 XCHG3
+        INC
+        SWAP
+        DUP
+    }>
+    DROP
+    REPEAT:<{ 8 STU }>
+""";
+
 () mint(int quantity) impure {
-    ;; todo:
-    ;; send message to mint NFTs to `sender`
+    while (quantity > 0) {
+        cell nfts = new_dict();
+        repeat (min(quantity, 250)) {
+            nfts~udict_set(64, last_index, begin_cell()
+                .store_coins(const::deploy_value)
+                .store_ref(begin_cell().store_int_as_string(last_index).store_slice(".json").end_cell())
+            .end_cell().begin_parse());
+            last_index += 1;
+        }
+        send_raw_message(begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(collection)
+            .store_coins(const::fees)
+            .store_uint(0, 107)
+            .store_uint(2, 32)
+            .store_uint(query_id, 64)
+            .store_ref(nfts)
+        .end_cell(), 1);
+        quantity -= 250;
+    }
 }
 
 () recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
     slice cs = in_msg_full.begin_parse();
     int flags = cs~load_uint(4);
-    if (flags & 1) {
+    if ((flags & 1) | in_msg_body.slice_empty?()) {
         return ();
     }
     sender = cs~load_msg_addr();
@@ -47,15 +89,16 @@ const int error::not_enough_value = 703;
     if (op == op::purchase) {
         slice signature = in_msg_body~load_bits(512);
         throw_unless(error::invalid_signature, check_signature(slice_hash(in_msg_body), signature, admin_pubkey));
-        int query_id = in_msg_body~load_uint(64);
+        query_id = in_msg_body~load_uint(64);
         slice user = in_msg_body~load_msg_addr();
         throw_unless(error::wrong_sender, equal_slices(sender, user));
 
-        int quantity = in_msg_body~load_uint(8);
+        int quantity = in_msg_body~load_uint(16);
         if (quantity > available) {
             quantity = available;
         }
-        throw_unless(error::not_enough_value, (msg_value - const::fees) < (quantity * price));
+        int value = (const::fees * 2 * ((quantity + 249) / 250)) + (quantity * (price + const::deploy_value));
+        throw_unless(error::not_enough_value, msg_value < value);
         available -= quantity;
         
         mint(quantity);
@@ -63,7 +106,7 @@ const int error::not_enough_value = 703;
         send_raw_message(begin_cell()
             .store_uint(0x18, 6)
             .store_slice(sender)
-            .store_coins(msg_value - const::fees - (quantity * price))
+            .store_coins(msg_value - value)
             .store_uint(0, 107)
         .end_cell(), 0);
 

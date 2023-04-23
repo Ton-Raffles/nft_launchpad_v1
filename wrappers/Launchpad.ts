@@ -4,6 +4,8 @@ export type LaunchpadConfig = {
     adminPubkey: Buffer;
     available: bigint;
     price: bigint;
+    lastIndex: bigint;
+    collection: Address;
 };
 
 export function launchpadConfigToCell(config: LaunchpadConfig): Cell {
@@ -11,6 +13,8 @@ export function launchpadConfigToCell(config: LaunchpadConfig): Cell {
         .storeBuffer(config.adminPubkey, 64)
         .storeUint(config.available, 32)
         .storeCoins(config.price)
+        .storeUint(config.lastIndex, 32)
+        .storeAddress(config.collection)
         .endCell();
 }
 
@@ -52,7 +56,7 @@ export class Launchpad implements Contract {
                 .storeBuffer(signature, 64)
                 .storeUint(queryId, 64)
                 .storeAddress(user)
-                .storeUint(quantity, 8)
+                .storeUint(quantity, 16)
                 .endCell(),
         });
     }
