@@ -6,6 +6,10 @@ export type LaunchpadConfig = {
     price: bigint;
     lastIndex: bigint;
     collection: Address;
+    buyerLimit: bigint;
+    buyers?: Cell;
+    startTime: bigint;
+    endTime: bigint;
 };
 
 export function launchpadConfigToCell(config: LaunchpadConfig): Cell {
@@ -15,6 +19,10 @@ export function launchpadConfigToCell(config: LaunchpadConfig): Cell {
         .storeCoins(config.price)
         .storeUint(config.lastIndex, 32)
         .storeAddress(config.collection)
+        .storeUint(config.buyerLimit, 32)
+        .storeMaybeRef(config.buyers)
+        .storeUint(config.startTime, 32)
+        .storeUint(config.endTime, 32)
         .endCell();
 }
 

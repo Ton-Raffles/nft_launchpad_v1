@@ -5,6 +5,10 @@ global int available;
 global int price;
 global int last_index;
 global slice collection;
+global int buyer_limit;
+global cell buyers;
+global int start_time;
+global int end_time;
 
 global int query_id;
 global slice sender;
@@ -17,6 +21,9 @@ const int const::deploy_value = 50000000;
 const int error::invalid_signature = 701;
 const int error::wrong_sender = 702;
 const int error::not_enough_value = 703;
+const int error::wrong_time = 704;
+const int error::zero_purchase = 705;
+const int error::wrong_workchain = 706;
 
 () load_data() impure {
     slice ds = get_data().begin_parse();
@@ -25,6 +32,10 @@ const int error::not_enough_value = 703;
     price = ds~load_coins();
     last_index = ds~load_uint(32);
     collection = ds~load_msg_addr();
+    buyer_limit = ds~load_uint(32);
+    buyers = ds~load_dict();
+    start_time = ds~load_uint(32);
+    end_time = ds~load_uint(32);
 }
 
 () save_data() impure {
@@ -34,6 +45,10 @@ const int error::not_enough_value = 703;
         .store_coins(price)
         .store_uint(last_index, 32)
         .store_slice(collection)
+        .store_uint(buyer_limit, 32)
+        .store_dict(buyers)
+        .store_uint(start_time, 32)
+        .store_uint(end_time, 32)
     .end_cell());
 }
 
@@ -87,19 +102,34 @@ const int error::not_enough_value = 703;
     int op = in_msg_body~load_uint(32);
 
     if (op == op::purchase) {
+        throw_unless(error::wrong_time, (now() >= start_time) & (now() <= end_time));
+
         slice signature = in_msg_body~load_bits(512);
         throw_unless(error::invalid_signature, check_signature(slice_hash(in_msg_body), signature, admin_pubkey));
         query_id = in_msg_body~load_uint(64);
         slice user = in_msg_body~load_msg_addr();
         throw_unless(error::wrong_sender, equal_slices(sender, user));
+        (int workchain, int account_id) = parse_std_addr(user);
+        throw_unless(error::wrong_workchain, workchain == 0);
 
         int quantity = in_msg_body~load_uint(16);
         if (quantity > available) {
             quantity = available;
         }
+        (slice v, int f?) = buyers.udict_get?(256, account_id);
+        int buyer_bought = 0;
+        if (f?) {
+            buyer_bought = v~load_uint(32);
+        }
+        if (quantity > (buyer_limit - buyer_bought)) {
+            quantity = buyer_limit - buyer_bought;
+        }
+        throw_unless(error::zero_purchase, quantity > 0);
+
         int value = (const::fees * 2 * ((quantity + 249) / 250)) + (quantity * (price + const::deploy_value));
         throw_unless(error::not_enough_value, msg_value < value);
         available -= quantity;
+        buyers~udict_set(256, account_id, begin_cell().store_uint(buyer_bought + quantity, 32).end_cell().begin_parse());
         
         mint(quantity);
 
