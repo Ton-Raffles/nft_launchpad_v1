@@ -73,7 +73,13 @@ const int error::wrong_workchain = 706;
         repeat (min(quantity, 250)) {
             nfts~udict_set(64, last_index, begin_cell()
                 .store_coins(const::deploy_value)
-                .store_ref(begin_cell().store_int_as_string(last_index).store_slice(".json").end_cell())
+                .store_ref(begin_cell()
+                    .store_slice(sender)
+                    .store_ref(begin_cell()
+                        .store_int_as_string(last_index)
+                        .store_slice(".json")
+                    .end_cell())
+                .end_cell())
             .end_cell().begin_parse());
             last_index += 1;
         }

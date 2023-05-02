@@ -23,11 +23,15 @@ describe('Launchpad', () => {
     let collection: SandboxContract<NFTCollection>;
     let admin: SandboxContract<TreasuryContract>;
     let adminKeypair: KeyPair;
+    let users: SandboxContract<TreasuryContract>[];
 
     beforeEach(async () => {
         blockchain = await Blockchain.create();
+        blockchain.now = 1700000000;
+
         admin = await blockchain.treasury('deployer');
         adminKeypair = keyPairFromSeed(await getSecureRandomBytes(32));
+        users = await blockchain.createWallets(5);
 
         collection = blockchain.openContract(
             NFTCollection.createFromConfig(
@@ -52,31 +56,43 @@ describe('Launchpad', () => {
                     lastIndex: 0n,
                     collection: collection.address,
                     buyerLimit: 2n,
-                    startTime: 1000000n,
-                    endTime: 2000000n,
+                    startTime: 1800000000n,
+                    endTime: 1900000000n,
                 },
                 code
             )
         );
 
-        let deployResult = await launchpad.sendDeploy(admin.getSender(), toNano('0.05'));
-        expect(deployResult.transactions).toHaveTransaction({
+        let result = await launchpad.sendDeploy(admin.getSender(), toNano('0.05'));
+        expect(result.transactions).toHaveTransaction({
             from: admin.address,
             to: launchpad.address,
             deploy: true,
             success: true,
         });
-        deployResult = await collection.sendDeploy(admin.getSender(), toNano('0.05'));
-        expect(deployResult.transactions).toHaveTransaction({
+        result = await collection.sendDeploy(admin.getSender(), toNano('0.05'));
+        expect(result.transactions).toHaveTransaction({
             from: admin.address,
             to: collection.address,
             deploy: true,
             success: true,
         });
+        result = await collection.sendChangeOwner(admin.getSender(), toNano('0.05'), launchpad.address);
+        expect(result.transactions).toHaveTransaction({
+            to: collection.address,
+            success: true,
+        });
     });
 
-    it('should deploy', async () => {
-        // the check is done inside beforeEach
-        // blockchain and launchpad are ready to use
+    it('should deploy', async () => {});
+
+    it('should mint one NFT', async () => {
+        blockchain.now = 1800000000;
+        const signature = launchpad.signPurchase(adminKeypair, 123n, users[0].address, 1n);
+        await launchpad.sendPurchase(users[0].getSender(), toNano('2.15'), signature, 123n, users[0].address, 1n);
+
+        expect(await collection.getNextItemIndex()).toEqual(1n);
+        const nft = blockchain.openContract(await collection.getNftItemByIndex(0n));
+        expect(await nft.getOwner()).toEqualAddress(users[0].address);
     });
 });

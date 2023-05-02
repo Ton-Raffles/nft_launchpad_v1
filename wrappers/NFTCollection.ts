@@ -70,7 +70,7 @@ export class NFTCollection implements Contract {
                 .storeRef(beginCell().storeAddress(via.address!).storeRef(Cell.EMPTY).endCell())
                 .endCell(),
         });
-        return NFTItem.createFromAddress(await this.getNftAddressByIndex(provider, itemIndex));
+        return this.getNftItemByIndex(provider, itemIndex);
     }
 
     async sendChangeOwner(provider: ContractProvider, via: Sender, value: bigint, newOwner: Address) {
@@ -85,7 +85,10 @@ export class NFTCollection implements Contract {
         return (await provider.get('get_collection_data', [])).stack.readBigNumber();
     }
 
-    async getNftAddressByIndex(provider: ContractProvider, index: bigint) {
-        return (await provider.get('get_nft_address_by_index', [{ type: 'int', value: index }])).stack.readAddress();
+    async getNftItemByIndex(provider: ContractProvider, index: bigint): Promise<NFTItem> {
+        const address = (
+            await provider.get('get_nft_address_by_index', [{ type: 'int', value: index }])
+        ).stack.readAddress();
+        return NFTItem.createFromAddress(address);
     }
 }
