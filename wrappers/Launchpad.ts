@@ -14,7 +14,7 @@ export type LaunchpadConfig = {
 
 export function launchpadConfigToCell(config: LaunchpadConfig): Cell {
     return beginCell()
-        .storeBuffer(config.adminPubkey, 64)
+        .storeBuffer(config.adminPubkey, 32)
         .storeUint(config.available, 32)
         .storeCoins(config.price)
         .storeUint(config.lastIndex, 32)
