@@ -53,17 +53,17 @@ const int error::wrong_workchain = 706;
 }
 
 (builder) store_int_as_string(builder b, int x) asm """
-    ZERO
-    SWAP
+    ZERO SWAP
+
     UNTIL:<{
         10 PUSHINT DIVMOD
         48 ADDCONST
-        s3 s1 s3 XCHG3
-        INC
-        SWAP
-        DUP
-    }>
-    DROP
+        s2 XCHG0
+        s2 s3 XCHG
+        INC SWAP
+        DUP ISZERO
+    }> DROP
+
     REPEAT:<{ 8 STU }>
 """;
 
@@ -127,7 +127,7 @@ const int error::wrong_workchain = 706;
         throw_unless(error::zero_purchase, quantity > 0);
 
         int value = (const::fees * 2 * ((quantity + 249) / 250)) + (quantity * (price + const::deploy_value));
-        throw_unless(error::not_enough_value, msg_value < value);
+        throw_unless(error::not_enough_value, msg_value >= value);
         available -= quantity;
         buyers~udict_set(256, account_id, begin_cell().store_uint(buyer_bought + quantity, 32).end_cell().begin_parse());
         
@@ -138,7 +138,7 @@ const int error::wrong_workchain = 706;
             .store_slice(sender)
             .store_coins(msg_value - value)
             .store_uint(0, 107)
-        .end_cell(), 0);
+        .end_cell(), 2);
 
         save_data();
     }

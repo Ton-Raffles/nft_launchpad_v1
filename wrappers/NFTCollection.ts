@@ -73,6 +73,14 @@ export class NFTCollection implements Contract {
         return NFTItem.createFromAddress(await this.getNftAddressByIndex(provider, itemIndex));
     }
 
+    async sendChangeOwner(provider: ContractProvider, via: Sender, value: bigint, newOwner: Address) {
+        await provider.internal(via, {
+            value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell().storeUint(3, 32).storeUint(0, 64).storeAddress(newOwner).endCell(),
+        });
+    }
+
     async getNextItemIndex(provider: ContractProvider) {
         return (await provider.get('get_collection_data', [])).stack.readBigNumber();
     }

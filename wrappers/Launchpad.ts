@@ -1,4 +1,5 @@
 import { Address, beginCell, Cell, Contract, contractAddress, ContractProvider, Sender, SendMode } from 'ton-core';
+import { KeyPair, sign } from 'ton-crypto';
 
 export type LaunchpadConfig = {
     adminPubkey: Buffer;
@@ -37,6 +38,11 @@ export class Launchpad implements Contract {
         const data = launchpadConfigToCell(config);
         const init = { code, data };
         return new Launchpad(contractAddress(workchain, init), init);
+    }
+
+    signPurchase(admin: KeyPair, queryId: bigint, user: Address, quantity: bigint): Buffer {
+        const body = beginCell().storeUint(queryId, 64).storeAddress(user).storeUint(quantity, 16).endCell();
+        return sign(body.hash(), admin.secretKey);
     }
 
     async sendDeploy(provider: ContractProvider, via: Sender, value: bigint) {
