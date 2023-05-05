@@ -23,7 +23,7 @@ export type NFTCollectionConfig = {
 export function NFTCollectionConfigToCell(config: NFTCollectionConfig): Cell {
     return beginCell()
         .storeAddress(config.owner)
-        .storeUint(1, 64)
+        .storeUint(0, 64)
         .storeRef(beginCell().storeRef(config.collectionContent).storeRef(config.commonContent).endCell())
         .storeRef(config.itemCode)
         .storeRef(

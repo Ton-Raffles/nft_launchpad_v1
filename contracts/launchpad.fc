@@ -70,7 +70,8 @@ const int error::wrong_workchain = 706;
 () mint(int quantity) impure {
     while (quantity > 0) {
         cell nfts = new_dict();
-        repeat (min(quantity, 250)) {
+        int N = min(quantity, 250);
+        repeat (N) {
             nfts~udict_set(64, last_index, begin_cell()
                 .store_coins(const::deploy_value)
                 .store_ref(begin_cell()
@@ -86,7 +87,7 @@ const int error::wrong_workchain = 706;
         send_raw_message(begin_cell()
             .store_uint(0x18, 6)
             .store_slice(collection)
-            .store_coins(const::fees)
+            .store_coins(const::fees * (N + 1))
             .store_uint(0, 107)
             .store_uint(2, 32)
             .store_uint(query_id, 64)
@@ -110,6 +111,7 @@ const int error::wrong_workchain = 706;
     if (op == op::purchase) {
         throw_unless(error::wrong_time, (now() >= start_time) & (now() <= end_time));
 
+        int quantity = in_msg_body~load_uint(16);
         slice signature = in_msg_body~load_bits(512);
         throw_unless(error::invalid_signature, check_signature(slice_hash(in_msg_body), signature, admin_pubkey));
         query_id = in_msg_body~load_uint(64);
@@ -118,7 +120,6 @@ const int error::wrong_workchain = 706;
         (int workchain, int account_id) = parse_std_addr(user);
         throw_unless(error::wrong_workchain, workchain == 0);
 
-        int quantity = in_msg_body~load_uint(16);
         if (quantity > available) {
             quantity = available;
         }

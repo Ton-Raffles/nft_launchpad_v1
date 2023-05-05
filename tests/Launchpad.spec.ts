@@ -2,7 +2,6 @@ import { Blockchain, SandboxContract, Treasury, TreasuryContract } from '@ton-co
 import { Cell, beginCell, toNano } from 'ton-core';
 import { Launchpad } from '../wrappers/Launchpad';
 import { NFTCollection } from '../wrappers/NFTCollection';
-import { NFTItem } from '../wrappers/NFTItem';
 import '@ton-community/test-utils';
 import { compile } from '@ton-community/blueprint';
 import { KeyPair, getSecureRandomBytes, keyPairFromSeed } from 'ton-crypto';
@@ -51,11 +50,11 @@ describe('Launchpad', () => {
             Launchpad.createFromConfig(
                 {
                     adminPubkey: adminKeypair.publicKey,
-                    available: 10n,
+                    available: 20n,
                     price: toNano('2'),
                     lastIndex: 0n,
                     collection: collection.address,
-                    buyerLimit: 2n,
+                    buyerLimit: 5n,
                     startTime: 1800000000n,
                     endTime: 1900000000n,
                 },
@@ -88,11 +87,43 @@ describe('Launchpad', () => {
 
     it('should mint one NFT', async () => {
         blockchain.now = 1800000000;
-        const signature = launchpad.signPurchase(adminKeypair, 123n, users[0].address, 1n);
-        await launchpad.sendPurchase(users[0].getSender(), toNano('2.15'), signature, 123n, users[0].address, 1n);
+        const signature = launchpad.signPurchase(adminKeypair, 123n, users[0].address);
+        const res = await launchpad.sendPurchase(
+            users[0].getSender(),
+            toNano('2.5'),
+            1n,
+            signature,
+            123n,
+            users[0].address
+        );
 
         expect(await collection.getNextItemIndex()).toEqual(1n);
         const nft = blockchain.openContract(await collection.getNftItemByIndex(0n));
         expect(await nft.getOwner()).toEqualAddress(users[0].address);
+    });
+
+    it('should mint several NFTs at once', async () => {
+        blockchain.now = 1800000000;
+        const signature = launchpad.signPurchase(adminKeypair, 123n, users[0].address);
+        await launchpad.sendPurchase(users[0].getSender(), toNano('12'), 5n, signature, 123n, users[0].address);
+
+        expect(await collection.getNextItemIndex()).toEqual(5n);
+        for (let i = 0; i < 5; i++) {
+            const nft = blockchain.openContract(await collection.getNftItemByIndex(BigInt(i)));
+            expect(await nft.getOwner()).toEqualAddress(users[0].address);
+        }
+    });
+
+    it('should mint several NFTs in separate transactions', async () => {
+        blockchain.now = 1800000000;
+        const signature = launchpad.signPurchase(adminKeypair, 123n, users[0].address);
+
+        for (let i = 0; i < 5; i++) {
+            await launchpad.sendPurchase(users[0].getSender(), toNano('2.5'), 1n, signature, 123n, users[0].address);
+
+            expect(await collection.getNextItemIndex()).toEqual(BigInt(i + 1));
+            const nft = blockchain.openContract(await collection.getNftItemByIndex(BigInt(i)));
+            expect(await nft.getOwner()).toEqualAddress(users[0].address);
+        }
     });
 });

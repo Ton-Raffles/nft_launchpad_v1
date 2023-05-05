@@ -40,8 +40,8 @@ export class Launchpad implements Contract {
         return new Launchpad(contractAddress(workchain, init), init);
     }
 
-    signPurchase(admin: KeyPair, queryId: bigint, user: Address, quantity: bigint): Buffer {
-        const body = beginCell().storeUint(queryId, 64).storeAddress(user).storeUint(quantity, 16).endCell();
+    signPurchase(admin: KeyPair, queryId: bigint, user: Address): Buffer {
+        const body = beginCell().storeUint(queryId, 64).storeAddress(user).endCell();
         return sign(body.hash(), admin.secretKey);
     }
 
@@ -57,20 +57,20 @@ export class Launchpad implements Contract {
         provider: ContractProvider,
         via: Sender,
         value: bigint,
+        quantity: bigint,
         signature: Buffer,
         queryId: bigint,
-        user: Address,
-        quantity: bigint
+        user: Address
     ) {
         await provider.internal(via, {
             value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
             body: beginCell()
                 .storeUint(0x4c56b6b5, 32)
+                .storeUint(quantity, 16)
                 .storeBuffer(signature, 64)
                 .storeUint(queryId, 64)
                 .storeAddress(user)
-                .storeUint(quantity, 16)
                 .endCell(),
         });
     }
