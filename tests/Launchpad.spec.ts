@@ -285,4 +285,44 @@ describe('Launchpad', () => {
             exitCode: 705,
         });
     });
+
+    it('should return unused coins', async () => {
+        blockchain.now = 1800000000;
+        const signature = launchpad.signPurchase(adminKeypair, 123n, users[0].address);
+        const res = await launchpad.sendPurchase(
+            users[0].getSender(),
+            toNano('10000'),
+            3n,
+            signature,
+            123n,
+            users[0].address
+        );
+
+        expect(res.transactions).toHaveTransaction({
+            from: launchpad.address,
+            to: users[0].address,
+            value: toNano('9993.729'),
+        });
+    });
+
+    it('should work with as little coins as possible', async () => {
+        blockchain.now = 1800000000;
+        const signature = launchpad.signPurchase(adminKeypair, 123n, users[0].address);
+
+        const res = await launchpad.sendPurchase(
+            users[0].getSender(),
+            toNano('6.269'),
+            3n,
+            signature,
+            123n,
+            users[0].address
+        );
+        expect(res.transactions).toHaveTransaction({
+            on: launchpad.address,
+            exitCode: 703,
+        });
+
+        await launchpad.sendPurchase(users[0].getSender(), toNano('6.27'), 3n, signature, 123n, users[0].address);
+        expect(await collection.getNextItemIndex()).toEqual(3n);
+    });
 });
