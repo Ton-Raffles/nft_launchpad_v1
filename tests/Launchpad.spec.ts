@@ -158,4 +158,131 @@ describe('Launchpad', () => {
 
         expect(await collection.getNextItemIndex()).toEqual(20n);
     });
+
+    it('should reject invalid signature', async () => {
+        blockchain.now = 1800000000;
+        const signature = launchpad.signPurchase(adminKeypair, 456n, users[0].address);
+        const res = await launchpad.sendPurchase(
+            users[0].getSender(),
+            toNano('2.5'),
+            1n,
+            signature,
+            123n,
+            users[0].address
+        );
+
+        expect(res.transactions).toHaveTransaction({
+            on: launchpad.address,
+            exitCode: 701,
+        });
+    });
+
+    it('should reject wrong sender', async () => {
+        blockchain.now = 1800000000;
+        const signature = launchpad.signPurchase(adminKeypair, 123n, users[0].address);
+        const res = await launchpad.sendPurchase(
+            users[1].getSender(),
+            toNano('2.5'),
+            1n,
+            signature,
+            123n,
+            users[0].address
+        );
+
+        expect(res.transactions).toHaveTransaction({
+            on: launchpad.address,
+            exitCode: 702,
+        });
+    });
+
+    it('should reject on not enough value', async () => {
+        blockchain.now = 1800000000;
+        const signature = launchpad.signPurchase(adminKeypair, 123n, users[0].address);
+        const res = await launchpad.sendPurchase(
+            users[0].getSender(),
+            toNano('2'),
+            1n,
+            signature,
+            123n,
+            users[0].address
+        );
+
+        expect(res.transactions).toHaveTransaction({
+            on: launchpad.address,
+            exitCode: 703,
+        });
+    });
+
+    it('should reject when too early', async () => {
+        blockchain.now = 1790000000;
+        const signature = launchpad.signPurchase(adminKeypair, 123n, users[0].address);
+        const res = await launchpad.sendPurchase(
+            users[0].getSender(),
+            toNano('2.5'),
+            1n,
+            signature,
+            123n,
+            users[0].address
+        );
+
+        expect(res.transactions).toHaveTransaction({
+            on: launchpad.address,
+            exitCode: 704,
+        });
+    });
+
+    it('should reject when too late', async () => {
+        blockchain.now = 1910000000;
+        const signature = launchpad.signPurchase(adminKeypair, 123n, users[0].address);
+        const res = await launchpad.sendPurchase(
+            users[0].getSender(),
+            toNano('2.5'),
+            1n,
+            signature,
+            123n,
+            users[0].address
+        );
+
+        expect(res.transactions).toHaveTransaction({
+            on: launchpad.address,
+            exitCode: 704,
+        });
+    });
+
+    it('should reject on trying to purchase 0 NFTs by accident', async () => {
+        blockchain.now = 1800000000;
+        const signature = launchpad.signPurchase(adminKeypair, 123n, users[0].address);
+        await launchpad.sendPurchase(users[0].getSender(), toNano('100'), 5n, signature, 123n, users[0].address);
+        const res = await launchpad.sendPurchase(
+            users[0].getSender(),
+            toNano('2.5'),
+            1n,
+            signature,
+            123n,
+            users[0].address
+        );
+
+        expect(res.transactions).toHaveTransaction({
+            on: launchpad.address,
+            exitCode: 705,
+        });
+    });
+
+    it('should reject on trying to purchase 0 NFTs', async () => {
+        blockchain.now = 1800000000;
+        const signature = launchpad.signPurchase(adminKeypair, 123n, users[0].address);
+        const res = await launchpad.sendPurchase(
+            users[0].getSender(),
+            toNano('1'),
+            0n,
+            signature,
+            123n,
+            users[0].address
+        );
+
+        expect(res.transactions).toHaveTransaction({
+            on: launchpad.address,
+            exitCode: 705,
+        });
+    });
 });
