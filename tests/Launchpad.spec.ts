@@ -30,7 +30,7 @@ describe('Launchpad', () => {
 
         admin = await blockchain.treasury('deployer');
         adminKeypair = keyPairFromSeed(await getSecureRandomBytes(32));
-        users = await blockchain.createWallets(5);
+        users = await blockchain.createWallets(10);
 
         collection = blockchain.openContract(
             NFTCollection.createFromConfig(
@@ -125,5 +125,37 @@ describe('Launchpad', () => {
             const nft = blockchain.openContract(await collection.getNftItemByIndex(BigInt(i)));
             expect(await nft.getOwner()).toEqualAddress(users[0].address);
         }
+    });
+
+    it('should not exceed the buyer limit', async () => {
+        blockchain.now = 1800000000;
+        const signature = launchpad.signPurchase(adminKeypair, 123n, users[0].address);
+
+        await launchpad.sendPurchase(users[0].getSender(), toNano('100'), 4n, signature, 123n, users[0].address);
+        expect(await collection.getNextItemIndex()).toEqual(4n);
+
+        await launchpad.sendPurchase(users[0].getSender(), toNano('100'), 2n, signature, 123n, users[0].address);
+        expect(await collection.getNextItemIndex()).toEqual(5n);
+
+        await launchpad.sendPurchase(users[0].getSender(), toNano('100'), 1n, signature, 123n, users[0].address);
+        expect(await collection.getNextItemIndex()).toEqual(5n);
+    });
+
+    it('should not exceed the total limit', async () => {
+        blockchain.now = 1800000000;
+
+        for (let i = 0; i < 10; i++) {
+            const signature = launchpad.signPurchase(adminKeypair, 123n, users[i].address);
+            const r = await launchpad.sendPurchase(
+                users[i].getSender(),
+                toNano('100'),
+                5n,
+                signature,
+                123n,
+                users[i].address
+            );
+        }
+
+        expect(await collection.getNextItemIndex()).toEqual(20n);
     });
 });

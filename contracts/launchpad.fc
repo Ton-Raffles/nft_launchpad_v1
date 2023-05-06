@@ -15,7 +15,7 @@ global slice sender;
 
 const int op::purchase = 0x4c56b6b5;
 
-const int const::fees = 50000000;
+const int const::fees = 60000000;
 const int const::deploy_value = 50000000;
 
 const int error::invalid_signature = 701;
@@ -84,6 +84,7 @@ const int error::wrong_workchain = 706;
             .end_cell().begin_parse());
             last_index += 1;
         }
+        
         send_raw_message(begin_cell()
             .store_uint(0x18, 6)
             .store_slice(collection)
@@ -93,6 +94,7 @@ const int error::wrong_workchain = 706;
             .store_uint(query_id, 64)
             .store_ref(nfts)
         .end_cell(), 1);
+
         quantity -= 250;
     }
 }
@@ -137,7 +139,7 @@ const int error::wrong_workchain = 706;
         throw_unless(error::not_enough_value, msg_value >= value);
         available -= quantity;
         buyers~udict_set(256, account_id, begin_cell().store_uint(buyer_bought + quantity, 32).end_cell().begin_parse());
-        
+
         mint(quantity);
 
         send_raw_message(begin_cell()
