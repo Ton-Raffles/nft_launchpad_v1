@@ -11,6 +11,7 @@ export type LaunchpadConfig = {
     buyers?: Cell;
     startTime: bigint;
     endTime: bigint;
+    adminAddress: Address;
 };
 
 export function launchpadConfigToCell(config: LaunchpadConfig): Cell {
@@ -24,6 +25,7 @@ export function launchpadConfigToCell(config: LaunchpadConfig): Cell {
         .storeMaybeRef(config.buyers)
         .storeUint(config.startTime, 32)
         .storeUint(config.endTime, 32)
+        .storeAddress(config.adminAddress)
         .endCell();
 }
 

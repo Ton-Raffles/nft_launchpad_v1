@@ -9,6 +9,7 @@ global int buyer_limit;
 global cell buyers;
 global int start_time;
 global int end_time;
+global slice admin_address;
 
 global int query_id;
 global slice sender;
@@ -17,6 +18,7 @@ const int op::purchase = 0x4c56b6b5;
 
 const int const::fees = 60000000;
 const int const::deploy_value = 50000000;
+const int const::fwd_fees = 20000000;
 
 const int error::invalid_signature = 701;
 const int error::wrong_sender = 702;
@@ -36,6 +38,7 @@ const int error::wrong_workchain = 706;
     buyers = ds~load_dict();
     start_time = ds~load_uint(32);
     end_time = ds~load_uint(32);
+    admin_address = ds~load_msg_addr();
 }
 
 () save_data() impure {
@@ -49,6 +52,7 @@ const int error::wrong_workchain = 706;
         .store_dict(buyers)
         .store_uint(start_time, 32)
         .store_uint(end_time, 32)
+        .store_slice(admin_address)
     .end_cell());
 }
 
@@ -142,12 +146,23 @@ const int error::wrong_workchain = 706;
 
         mint(quantity);
 
-        send_raw_message(begin_cell()
-            .store_uint(0x18, 6)
-            .store_slice(sender)
-            .store_coins(msg_value - value)
-            .store_uint(0, 107)
-        .end_cell(), 2);
+        if (msg_value - value > const::fwd_fees) {
+            send_raw_message(begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(sender)
+                .store_coins(msg_value - value)
+                .store_uint(0, 107)
+            .end_cell(), 0);
+        }
+
+        if (quantity * price > 0) {
+            send_raw_message(begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(admin_address)
+                .store_coins(quantity * price)
+                .store_uint(0, 107)
+            .end_cell(), 1);
+        }
 
         save_data();
     }

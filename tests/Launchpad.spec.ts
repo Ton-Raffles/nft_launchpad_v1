@@ -57,6 +57,7 @@ describe('Launchpad', () => {
                     buyerLimit: 5n,
                     startTime: 1800000000n,
                     endTime: 1900000000n,
+                    adminAddress: admin.address,
                 },
                 code
             )
@@ -324,5 +325,24 @@ describe('Launchpad', () => {
 
         await launchpad.sendPurchase(users[0].getSender(), toNano('6.27'), 3n, signature, 123n, users[0].address);
         expect(await collection.getNextItemIndex()).toEqual(3n);
+    });
+
+    it('should transfer funds to admin after successful purchase', async () => {
+        blockchain.now = 1800000000;
+        const signature = launchpad.signPurchase(adminKeypair, 123n, users[0].address);
+
+        const res = await launchpad.sendPurchase(
+            users[0].getSender(),
+            toNano('6.27'),
+            3n,
+            signature,
+            123n,
+            users[0].address
+        );
+        expect(res.transactions).toHaveTransaction({
+            from: launchpad.address,
+            to: admin.address,
+            value: toNano('6'),
+        });
     });
 });
