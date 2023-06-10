@@ -30,12 +30,21 @@ async function checkIfAddressHoldsNFT(address: Address, collection: Address): Pr
     return items.length > 0;
 }
 
+async function checkIfAddressHoldsJetton(address: Address, jetton: Address): Promise<boolean> {
+    const result = await axios.get(endpoint + '/v2/accounts/' + address.toRawString() + '/jettons', {
+        headers: {
+            Authorization: 'Bearer ' + tonApiKey,
+        },
+    });
+    const balances = result.data.balances!.filter((j: any) => j.jetton.address == jetton.toRawString());
+    if (balances.length == 0) {
+        return false;
+    }
+    return balances.balance! != '0';
+}
+
 app.get('/', async (req, res) => {
     res.send('Hello World!');
-    checkIfAddressHoldsNFT(
-        Address.parse('EQBKgXCNLPexWhs2L79kiARR1phGH1LwXxRbNsCFF9doc2lN'),
-        Address.parse('EQDvRFMYLdxmvY3Tk-cfWMLqDnXF_EclO2Fp4wwj33WhlNFT')
-    );
 });
 
 app.listen(process.env.PORT!, () => {
