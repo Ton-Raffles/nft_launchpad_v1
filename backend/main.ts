@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import axios from 'axios';
 import jwt, { JwtPayload } from 'jsonwebtoken';
+import { Pool } from 'pg';
 import { config } from 'dotenv';
 import { keyPairFromSecretKey } from 'ton-crypto';
 import { Address } from 'ton';
@@ -13,6 +14,23 @@ const adminAddress = Address.parse(process.env.ADMIN_ADDRESS!);
 const endpoint = process.env.TONAPI_ENDPOINT;
 const tonApiKey = process.env.TONAPI_KEY!;
 const jwtSecretKey = process.env.JWT_ADMIN!;
+
+const pool = new Pool({
+    user: process.env.PGUSER,
+    host: process.env.PGHOST,
+    database: process.env.PGDATABASE,
+    password: process.env.PGPASSWORD,
+    port: parseInt(process.env.PGPORT!),
+});
+
+pool.query(`
+    CREATE TABLE IF NOT EXISTS launchpads (
+        id SERIAL PRIMARY KEY,
+        nft_collections JSONB,
+        jettons JSONB,
+        whitelisted_users text[]
+    )
+`);
 
 interface JwtPayloadWithRole extends JwtPayload {
     role?: string;
@@ -74,13 +92,85 @@ function authorizeAdmin(req: Request, res: Response, next: NextFunction) {
     });
 }
 
-app.get('/createLaunchpad', authorizeAdmin, async (req, res) => {});
+app.post('/createLaunchpad', authorizeAdmin, async (req, res) => {
+    const { nft_collections, jettons, whitelisted_users } = req.body;
+    try {
+        const result = await pool.query(
+            'INSERT INTO launchpads (nft_collections, jettons, whitelisted_users) VALUES ($1, $2, $3) RETURNING *',
+            [nft_collections, jettons, whitelisted_users]
+        );
+        res.json(result.rows[0]);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
-app.get('/removeLaunchpad', authorizeAdmin, async (req, res) => {});
+app.delete('/removeLaunchpad/:id', authorizeAdmin, async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('DELETE FROM launchpads WHERE id = $1', [id]);
+        res.json({ message: 'Deleted launchpad' });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
-app.get('/editLaunchpad', authorizeAdmin, async (req, res) => {});
+app.put('/editLaunchpad/:id', authorizeAdmin, async (req, res) => {
+    const { id } = req.params;
+    const { nft_collections, jettons, whitelisted_users } = req.body;
+    try {
+        const result = await pool.query(
+            'UPDATE launchpads SET nft_collections = $1, jettons = $2, whitelisted_users = $3 WHERE id = $4 RETURNING *',
+            [nft_collections, jettons, whitelisted_users, id]
+        );
+        res.json(result.rows[0]);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
-app.get('/checkUser', async (req, res) => {});
+app.get('/checkUser/:launchpadId', async (req, res) => {
+    const { launchpadId } = req.params;
+    const { address } = req.query;
+
+    try {
+        const result = await pool.query('SELECT * FROM launchpads WHERE id = $1', [launchpadId]);
+        const launchpad = result.rows[0];
+
+        if (!launchpad) {
+            return res.status(404).send('Launchpad not found');
+        }
+
+        const userAddress = Address.parse(address as string);
+
+        // Check if user is whitelisted
+        if (launchpad.whitelisted_users.includes(address)) {
+            return res.json({ access: true });
+        }
+
+        // Check if user holds necessary NFTs
+        for (let nftCollection of launchpad.nft_collections) {
+            const nftAddress = Address.parse(nftCollection);
+            const hasNFT = await checkIfAddressHoldsNFT(userAddress, nftAddress);
+            if (!hasNFT) {
+                return res.json({ access: false, reason: 'User does not hold the necessary NFTs.' });
+            }
+        }
+
+        // Check if user holds necessary jettons
+        for (let jetton of launchpad.jettons) {
+            const jettonAddress = Address.parse(jetton);
+            const hasJetton = await checkIfAddressHoldsJetton(userAddress, jettonAddress);
+            if (!hasJetton) {
+                return res.json({ access: false, reason: 'User does not hold the necessary jettons.' });
+            }
+        }
+
+        return res.json({ access: true });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 app.listen(process.env.PORT!, () => {
     console.log(`API is listening on port ${process.env.PORT!}`);
