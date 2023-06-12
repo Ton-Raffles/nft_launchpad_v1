@@ -26,8 +26,8 @@ const pool = new Pool({
 pool.query(`
     CREATE TABLE IF NOT EXISTS launchpads (
         id SERIAL PRIMARY KEY,
-        nft_collections JSONB,
-        jettons JSONB,
+        nft_collection TEXT,
+        jetton TEXT,
         whitelisted_users text[]
     )
 `);
@@ -148,21 +148,21 @@ app.get('/checkUser/:launchpadId', async (req, res) => {
             return res.json({ access: true });
         }
 
-        // Check if user holds necessary NFTs
-        for (let nftCollection of launchpad.nft_collections) {
-            const nftAddress = Address.parse(nftCollection);
+        // Check if user holds necessary NFT
+        if (launchpad.nft_collection) {
+            const nftAddress = Address.parse(launchpad.nft_collection);
             const hasNFT = await checkIfAddressHoldsNFT(userAddress, nftAddress);
             if (!hasNFT) {
-                return res.json({ access: false, reason: 'User does not hold the necessary NFTs.' });
+                return res.json({ access: false, reason: 'User does not hold the necessary NFT.' });
             }
         }
 
-        // Check if user holds necessary jettons
-        for (let jetton of launchpad.jettons) {
-            const jettonAddress = Address.parse(jetton);
+        // Check if user holds necessary Jetton
+        if (launchpad.jetton) {
+            const jettonAddress = Address.parse(launchpad.jetton);
             const hasJetton = await checkIfAddressHoldsJetton(userAddress, jettonAddress);
             if (!hasJetton) {
-                return res.json({ access: false, reason: 'User does not hold the necessary jettons.' });
+                return res.json({ access: false, reason: 'User does not hold the necessary Jetton.' });
             }
         }
 
