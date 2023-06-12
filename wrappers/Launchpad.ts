@@ -26,6 +26,7 @@ export function launchpadConfigToCell(config: LaunchpadConfig): Cell {
         .storeUint(config.startTime, 32)
         .storeUint(config.endTime, 32)
         .storeAddress(config.adminAddress)
+        .storeUint(1, 1)
         .endCell();
 }
 
@@ -74,6 +75,14 @@ export class Launchpad implements Contract {
                 .storeUint(queryId, 64)
                 .storeAddress(user)
                 .endCell(),
+        });
+    }
+
+    async sendChangeCollectionOwner(provider: ContractProvider, via: Sender, value: bigint, newOwner: Address) {
+        await provider.internal(via, {
+            value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell().storeUint(0x379ef53b, 32).storeAddress(newOwner).endCell(),
         });
     }
 }

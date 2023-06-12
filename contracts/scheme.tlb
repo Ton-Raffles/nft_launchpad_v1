@@ -1,3 +1,4 @@
 #_ admin_pubkey:uint256 available:uint32 price:Coins last_index:uint32 collection:MsgAddressInt buyer_limit:uint32 buyers:(HashmapE 256 uint32) start_time:uint32 end_time:uint32 = LaunchpadStorage;
 
 purchase#4c56b6b5 quantity:uint16 signature:bits512 query_id:uint64 user:MsgAddressInt = InternalMsgBody;
+change_collection_owner#379ef53b new_owner:MsgAddressInt = InternalMsgBody;

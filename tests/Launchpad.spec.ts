@@ -345,4 +345,32 @@ describe('Launchpad', () => {
             value: toNano('6'),
         });
     });
+
+    it('should change the owner of collection and set inactive', async () => {
+        let result = await launchpad.sendChangeCollectionOwner(admin.getSender(), toNano('0.05'), users[0].address);
+        expect(result.transactions).toHaveTransaction({
+            from: launchpad.address,
+            to: collection.address,
+            success: true,
+            op: 3,
+        });
+        expect(await collection.getOwner()).toEqualAddress(users[0].address);
+
+        blockchain.now = 1800000000;
+        const signature = launchpad.signPurchase(adminKeypair, 123n, users[0].address);
+        result = await launchpad.sendPurchase(
+            users[0].getSender(),
+            toNano('2.5'),
+            1n,
+            signature,
+            123n,
+            users[0].address
+        );
+        expect(result.transactions).toHaveTransaction({
+            from: users[0].address,
+            to: launchpad.address,
+            success: false,
+            exitCode: 707,
+        });
+    });
 });

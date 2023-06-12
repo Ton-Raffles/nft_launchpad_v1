@@ -10,11 +10,13 @@ global cell buyers;
 global int start_time;
 global int end_time;
 global slice admin_address;
+global int active?;
 
 global int query_id;
 global slice sender;
 
 const int op::purchase = 0x4c56b6b5;
+const int op::change_collection_owner = 0x379ef53b;
 
 const int const::fees = 60000000;
 const int const::deploy_value = 50000000;
@@ -26,6 +28,7 @@ const int error::not_enough_value = 703;
 const int error::wrong_time = 704;
 const int error::zero_purchase = 705;
 const int error::wrong_workchain = 706;
+const int error::inactive = 707;
 
 () load_data() impure {
     slice ds = get_data().begin_parse();
@@ -39,6 +42,7 @@ const int error::wrong_workchain = 706;
     start_time = ds~load_uint(32);
     end_time = ds~load_uint(32);
     admin_address = ds~load_msg_addr();
+    active? = ds~load_int(1);
 }
 
 () save_data() impure {
@@ -53,6 +57,7 @@ const int error::wrong_workchain = 706;
         .store_uint(start_time, 32)
         .store_uint(end_time, 32)
         .store_slice(admin_address)
+        .store_int(active?, 1)
     .end_cell());
 }
 
@@ -112,6 +117,8 @@ const int error::wrong_workchain = 706;
     sender = cs~load_msg_addr();
     load_data();
 
+    throw_unless(error::inactive, active?);
+
     int op = in_msg_body~load_uint(32);
 
     if (op == op::purchase) {
@@ -164,6 +171,22 @@ const int error::wrong_workchain = 706;
             .end_cell(), 1);
         }
 
+        save_data();
+    }
+
+    elseif (op == op::change_collection_owner) {
+        throw_unless(error::wrong_sender, equal_slices(sender, admin_address)); ;; Only admin can change the collection owner
+        slice new_owner = in_msg_body~load_msg_addr();
+        send_raw_message(begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(collection)
+            .store_coins(0)
+            .store_uint(0, 107)
+            .store_uint(3, 32)
+            .store_uint(0, 64)
+            .store_slice(new_owner)
+        .end_cell(), 64);
+        active? = 0;
         save_data();
     }
 }

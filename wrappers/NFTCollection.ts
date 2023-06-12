@@ -91,4 +91,10 @@ export class NFTCollection implements Contract {
         ).stack.readAddress();
         return NFTItem.createFromAddress(address);
     }
+
+    async getOwner(provider: ContractProvider): Promise<Address> {
+        const result = (await provider.get('get_collection_data', [])).stack;
+        result.skip(2);
+        return result.readAddress();
+    }
 }
