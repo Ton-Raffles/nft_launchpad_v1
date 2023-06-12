@@ -89,6 +89,18 @@ async function sendRawMessage(message: Cell): Promise<[number, any[]]> {
     return [result.status, result.data];
 }
 
+// This function fetches the latest seqno for admin wallet
+async function fetchSeqno(): Promise<number> {
+    const result = await axios.get(endpoint + `/v2/blockchain/accounts/${adminAddress.toRawString()}/methods/seqno`, {
+        headers: {
+            Authorization: 'Bearer ' + tonApiKey,
+        },
+    });
+    const hexSeqno = result.data.stack[0].num;
+    const decSeqno = parseInt(hexSeqno, 16);
+    return decSeqno;
+}
+
 function authorizeAdmin(req: Request, res: Response, next: NextFunction) {
     const authHeader = req.headers.authorization;
 
@@ -131,7 +143,7 @@ app.post('/createLaunchpad', authorizeAdmin, async (req, res) => {
         const contract = Launchpad.createFromConfig(config, launchpadCode);
 
         const transferCell = adminWallet.createTransfer({
-            seqno: 0,
+            seqno: await fetchSeqno(),
             secretKey: keyPair.secretKey,
             messages: [
                 internal({
@@ -201,7 +213,7 @@ app.put('/changeCollectionOwner/:id', authorizeAdmin, async (req, res) => {
         const message = beginCell().storeUint(0x379ef53b, 32).storeAddress(newOwnerAddress).endCell();
 
         const callMessage = adminWallet.createTransfer({
-            seqno: 0,
+            seqno: await fetchSeqno(),
             secretKey: keyPair.secretKey,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
             messages: [
