@@ -116,14 +116,6 @@ app.post('/createLaunchpad', authorizeAdmin, async (req, res) => {
     const { nft_collection, jetton, whitelisted_users, startTime, endTime, price, available, buyerLimit, lastIndex } =
         req.body;
     try {
-        // 1. Insert the new launchpad into the database
-        const result = await pool.query(
-            'INSERT INTO launchpads (nft_collection, jetton, whitelisted_users) VALUES ($1, $2, $3) RETURNING *',
-            [nft_collection, jetton, whitelisted_users]
-        );
-        const launchpadData = result.rows[0];
-
-        // 2. Assemble the configuration for the contract
         const config: LaunchpadConfig = {
             adminPubkey: keyPair.publicKey,
             available: BigInt(available),
@@ -136,8 +128,6 @@ app.post('/createLaunchpad', authorizeAdmin, async (req, res) => {
             adminAddress: adminAddress,
         };
 
-        // 3. Create the contract
-        // Note: You need to provide the contract's code Cell (e.g. fetched from some other source)
         const contract = Launchpad.createFromConfig(config, launchpadCode);
 
         const transferCell = adminWallet.createTransfer({
@@ -155,15 +145,18 @@ app.post('/createLaunchpad', authorizeAdmin, async (req, res) => {
             ],
         });
 
-        // 4. Deploy the contract to the blockchain
-        // Note: You need to provide the ContractProvider and Sender, as well as the initial balance (in nanograms)
         const [status, error] = await sendRawMessage(transferCell);
         if (status != 200) {
             res.status(status).json({ error });
         }
 
-        // Return the new launchpad data, along with the contract address
-        res.json({ ...launchpadData, contractAddress: contract.address.toString() });
+        const result = await pool.query(
+            'INSERT INTO launchpads (nft_collection, jetton, whitelisted_users) VALUES ($1, $2, $3) RETURNING *',
+            [nft_collection, jetton, whitelisted_users]
+        );
+        const launchpadData = result.rows[0];
+
+        res.json({ id: launchpadData.id, contractAddress: contract.address.toString() });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
