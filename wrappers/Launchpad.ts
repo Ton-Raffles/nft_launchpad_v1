@@ -27,6 +27,7 @@ export function launchpadConfigToCell(config: LaunchpadConfig): Cell {
         .storeUint(config.endTime, 32)
         .storeAddress(config.adminAddress)
         .storeUint(1, 1)
+        .storeUint(Math.floor(Math.random() * 10000), 16)
         .endCell();
 }
 

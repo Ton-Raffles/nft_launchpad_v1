@@ -4,7 +4,9 @@ import jwt, { JwtPayload } from 'jsonwebtoken';
 import { Pool } from 'pg';
 import { config } from 'dotenv';
 import { keyPairFromSecretKey } from 'ton-crypto';
-import { Address } from 'ton';
+import { Address, Cell, WalletContractV3R2, internal } from 'ton';
+import { Launchpad, LaunchpadConfig, launchpadConfigToCell } from '../wrappers/Launchpad';
+import * as fs from 'fs';
 
 config();
 
@@ -14,6 +16,10 @@ const adminAddress = Address.parse(process.env.ADMIN_ADDRESS!);
 const endpoint = process.env.TONAPI_ENDPOINT;
 const tonApiKey = process.env.TONAPI_KEY!;
 const jwtSecretKey = process.env.JWT_ADMIN!;
+const launchpadCode = Cell.fromBoc(
+    Buffer.from(JSON.parse(fs.readFileSync('./build/Launchpad.compiled.json').toString('utf-8')).hex, 'hex')
+)[0];
+const adminWallet = WalletContractV3R2.create({ workchain: 0, publicKey: keyPair.publicKey });
 
 const pool = new Pool({
     user: process.env.PGUSER,
@@ -28,7 +34,8 @@ pool.query(`
         id SERIAL PRIMARY KEY,
         nft_collection TEXT,
         jetton TEXT,
-        whitelisted_users text[]
+        whitelisted_users text[],
+        status TEXT DEFAULT 'active'
     )
 `);
 
@@ -69,6 +76,19 @@ async function checkIfAddressHoldsJetton(address: Address, jetton: Address): Pro
     return balances.balance! != '0';
 }
 
+// This function checks whether user has positive balance of specific Jetton
+async function sendRawMessage(message: Cell): Promise<[number, any[]]> {
+    const result = await axios.post(endpoint + '/v2/blockchain/message', {
+        headers: {
+            Authorization: 'Bearer ' + tonApiKey,
+        },
+        data: {
+            boc: message.toBoc(),
+        },
+    });
+    return [result.status, result.data];
+}
+
 function authorizeAdmin(req: Request, res: Response, next: NextFunction) {
     const authHeader = req.headers.authorization;
 
@@ -93,23 +113,67 @@ function authorizeAdmin(req: Request, res: Response, next: NextFunction) {
 }
 
 app.post('/createLaunchpad', authorizeAdmin, async (req, res) => {
-    const { nft_collections, jettons, whitelisted_users } = req.body;
+    const { nft_collection, jetton, whitelisted_users, startTime, endTime, price, available, buyerLimit, lastIndex } =
+        req.body;
     try {
+        // 1. Insert the new launchpad into the database
         const result = await pool.query(
-            'INSERT INTO launchpads (nft_collections, jettons, whitelisted_users) VALUES ($1, $2, $3) RETURNING *',
-            [nft_collections, jettons, whitelisted_users]
+            'INSERT INTO launchpads (nft_collection, jetton, whitelisted_users) VALUES ($1, $2, $3) RETURNING *',
+            [nft_collection, jetton, whitelisted_users]
         );
-        res.json(result.rows[0]);
+        const launchpadData = result.rows[0];
+
+        // 2. Assemble the configuration for the contract
+        const config: LaunchpadConfig = {
+            adminPubkey: keyPair.publicKey,
+            available: BigInt(available),
+            price: BigInt(price),
+            lastIndex: BigInt(lastIndex),
+            collection: Address.parse(nft_collection),
+            buyerLimit: BigInt(buyerLimit),
+            startTime: BigInt(startTime),
+            endTime: BigInt(endTime),
+            adminAddress: adminAddress,
+        };
+
+        // 3. Create the contract
+        // Note: You need to provide the contract's code Cell (e.g. fetched from some other source)
+        const contract = Launchpad.createFromConfig(config, launchpadCode);
+
+        const transferCell = adminWallet.createTransfer({
+            seqno: 0,
+            secretKey: keyPair.secretKey,
+            messages: [
+                internal({
+                    value: '0.1',
+                    to: contract.address,
+                    init: {
+                        code: launchpadCode,
+                        data: launchpadConfigToCell(config),
+                    },
+                }),
+            ],
+        });
+
+        // 4. Deploy the contract to the blockchain
+        // Note: You need to provide the ContractProvider and Sender, as well as the initial balance (in nanograms)
+        const [status, error] = await sendRawMessage(transferCell);
+        if (status != 200) {
+            res.status(status).json({ error });
+        }
+
+        // Return the new launchpad data, along with the contract address
+        res.json({ ...launchpadData, contractAddress: contract.address.toString() });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.delete('/removeLaunchpad/:id', authorizeAdmin, async (req, res) => {
+app.put('/removeLaunchpad/:id', authorizeAdmin, async (req, res) => {
     const { id } = req.params;
     try {
-        await pool.query('DELETE FROM launchpads WHERE id = $1', [id]);
-        res.json({ message: 'Deleted launchpad' });
+        await pool.query('UPDATE launchpads SET status = $1 WHERE id = $2', ['inactive', id]);
+        res.json({ message: 'Marked launchpad as inactive' });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
@@ -117,11 +181,11 @@ app.delete('/removeLaunchpad/:id', authorizeAdmin, async (req, res) => {
 
 app.put('/editLaunchpad/:id', authorizeAdmin, async (req, res) => {
     const { id } = req.params;
-    const { nft_collections, jettons, whitelisted_users } = req.body;
+    const { nft_collection, jetton, whitelisted_users } = req.body;
     try {
         const result = await pool.query(
-            'UPDATE launchpads SET nft_collections = $1, jettons = $2, whitelisted_users = $3 WHERE id = $4 RETURNING *',
-            [nft_collections, jettons, whitelisted_users, id]
+            'UPDATE launchpads SET nft_collection = $1, jetton = $2, whitelisted_users = $3 WHERE id = $4 RETURNING *',
+            [nft_collection, jetton, whitelisted_users, id]
         );
         res.json(result.rows[0]);
     } catch (err: any) {
@@ -134,7 +198,10 @@ app.get('/checkUser/:launchpadId', async (req, res) => {
     const { address } = req.query;
 
     try {
-        const result = await pool.query('SELECT * FROM launchpads WHERE id = $1', [launchpadId]);
+        const result = await pool.query('SELECT * FROM launchpads WHERE id = $1 AND status = $2', [
+            launchpadId,
+            'active',
+        ]);
         const launchpad = result.rows[0];
 
         if (!launchpad) {
