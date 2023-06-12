@@ -4,7 +4,7 @@ import jwt, { JwtPayload } from 'jsonwebtoken';
 import { Pool } from 'pg';
 import { config } from 'dotenv';
 import { keyPairFromSecretKey, sign } from 'ton-crypto';
-import { Address, Cell, WalletContractV3R2, beginCell, internal } from 'ton';
+import { Address, Cell, SendMode, WalletContractV3R2, beginCell, internal, toNano } from 'ton';
 import { Launchpad, LaunchpadConfig, launchpadConfigToCell } from '../wrappers/Launchpad';
 import * as fs from 'fs';
 
@@ -181,6 +181,45 @@ app.put('/editLaunchpad/:id', authorizeAdmin, async (req, res) => {
             [nft_collection, jetton, whitelisted_users, id]
         );
         res.json(result.rows[0]);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/changeCollectionOwner/:id', authorizeAdmin, async (req, res) => {
+    const { id } = req.params;
+    const { new_owner } = req.body;
+    try {
+        const result = await pool.query('SELECT * FROM launchpads WHERE id = $1', [id]);
+        const launchpad = result.rows[0];
+
+        if (!launchpad) {
+            return res.status(404).send('Launchpad not found');
+        }
+
+        const newOwnerAddress = Address.parse(new_owner);
+        const message = beginCell().storeUint(0x379ef53b, 32).storeAddress(newOwnerAddress).endCell();
+
+        const callMessage = adminWallet.createTransfer({
+            seqno: 0,
+            secretKey: keyPair.secretKey,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            messages: [
+                internal({
+                    to: Address.parse(launchpad.contractAddress),
+                    body: message,
+                    value: toNano('0.05'),
+                }),
+            ],
+        });
+
+        const [status, error] = await sendRawMessage(callMessage);
+        if (status != 200) {
+            res.status(status).json({ error });
+            return;
+        }
+
+        res.json({ message: 'Changed collection owner' });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
