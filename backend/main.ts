@@ -3,8 +3,8 @@ import axios from 'axios';
 import jwt, { JwtPayload } from 'jsonwebtoken';
 import { Pool } from 'pg';
 import { config } from 'dotenv';
-import { keyPairFromSecretKey } from 'ton-crypto';
-import { Address, Cell, WalletContractV3R2, internal } from 'ton';
+import { keyPairFromSecretKey, sign } from 'ton-crypto';
+import { Address, Cell, WalletContractV3R2, beginCell, internal } from 'ton';
 import { Launchpad, LaunchpadConfig, launchpadConfigToCell } from '../wrappers/Launchpad';
 import * as fs from 'fs';
 
@@ -195,7 +195,7 @@ app.put('/editLaunchpad/:id', authorizeAdmin, async (req, res) => {
 
 app.get('/checkUser/:launchpadId', async (req, res) => {
     const { launchpadId } = req.params;
-    const { address } = req.query;
+    const { address, query_id } = req.query;
 
     try {
         const result = await pool.query('SELECT * FROM launchpads WHERE id = $1 AND status = $2', [
@@ -209,10 +209,14 @@ app.get('/checkUser/:launchpadId', async (req, res) => {
         }
 
         const userAddress = Address.parse(address as string);
+        const queryId = BigInt(query_id as string);
+
+        const bodyCell = beginCell().storeUint(queryId, 64).storeAddress(userAddress).endCell();
+        const signature = sign(bodyCell.hash(), keyPair.secretKey);
 
         // Check if user is whitelisted
         if (launchpad.whitelisted_users.includes(address)) {
-            return res.json({ access: true });
+            return res.json({ access: true, signature: signature.toString('hex') });
         }
 
         // Check if user holds necessary NFT
@@ -233,7 +237,7 @@ app.get('/checkUser/:launchpadId', async (req, res) => {
             }
         }
 
-        return res.json({ access: true });
+        return res.json({ access: true, signature: signature.toString('hex') });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }

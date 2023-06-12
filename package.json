@@ -3,8 +3,8 @@
     "license": "MIT",
     "scripts": {
         "test": "jest",
-        "build": "tsc --build --clean && tsc --build",
-        "start": "yarn build && node dist/main.js"
+        "build": "yarn blueprint build Launchpad && tsc --build --clean && tsc --build",
+        "start": "yarn build && node dist/backend/main.js"
     },
     "devDependencies": {
         "@ton-community/blueprint": "^0.8.0",
