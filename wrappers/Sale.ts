@@ -1,7 +1,7 @@
 import { Address, beginCell, Cell, Contract, contractAddress, ContractProvider, Sender, SendMode } from 'ton-core';
 import { KeyPair, sign } from 'ton-crypto';
 
-export type LaunchpadConfig = {
+export type SaleConfig = {
     adminPubkey: Buffer;
     available: bigint;
     price: bigint;
@@ -14,7 +14,7 @@ export type LaunchpadConfig = {
     adminAddress: Address;
 };
 
-export function launchpadConfigToCell(config: LaunchpadConfig): Cell {
+export function saleConfigToCell(config: SaleConfig): Cell {
     return beginCell()
         .storeBuffer(config.adminPubkey, 32)
         .storeUint(config.available, 32)
@@ -31,17 +31,17 @@ export function launchpadConfigToCell(config: LaunchpadConfig): Cell {
         .endCell();
 }
 
-export class Launchpad implements Contract {
+export class Sale implements Contract {
     constructor(readonly address: Address, readonly init?: { code: Cell; data: Cell }) {}
 
     static createFromAddress(address: Address) {
-        return new Launchpad(address);
+        return new Sale(address);
     }
 
-    static createFromConfig(config: LaunchpadConfig, code: Cell, workchain = 0) {
-        const data = launchpadConfigToCell(config);
+    static createFromConfig(config: SaleConfig, code: Cell, workchain = 0) {
+        const data = saleConfigToCell(config);
         const init = { code, data };
-        return new Launchpad(contractAddress(workchain, init), init);
+        return new Sale(contractAddress(workchain, init), init);
     }
 
     signPurchase(admin: KeyPair, queryId: bigint, user: Address): Buffer {

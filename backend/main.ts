@@ -5,7 +5,7 @@ import { Pool } from 'pg';
 import { config } from 'dotenv';
 import { keyPairFromSecretKey, sign } from 'ton-crypto';
 import { Address, Cell, SendMode, WalletContractV3R2, beginCell, internal, toNano } from 'ton';
-import { Launchpad, LaunchpadConfig, launchpadConfigToCell } from '../wrappers/Launchpad';
+import { Sale, SaleConfig, saleConfigToCell } from '../wrappers/Sale';
 import * as fs from 'fs';
 
 config();
@@ -16,8 +16,8 @@ const adminAddress = Address.parse(process.env.ADMIN_ADDRESS!);
 const endpoint = process.env.TONAPI_ENDPOINT;
 const tonApiKey = process.env.TONAPI_KEY!;
 const jwtSecretKey = process.env.JWT_ADMIN!;
-const launchpadCode = Cell.fromBoc(
-    Buffer.from(JSON.parse(fs.readFileSync('./build/Launchpad.compiled.json').toString('utf-8')).hex, 'hex')
+const saleCode = Cell.fromBoc(
+    Buffer.from(JSON.parse(fs.readFileSync('./build/Sale.compiled.json').toString('utf-8')).hex, 'hex')
 )[0];
 const adminWallet = WalletContractV3R2.create({ workchain: 0, publicKey: keyPair.publicKey });
 
@@ -30,7 +30,7 @@ const pool = new Pool({
 });
 
 pool.query(`
-    CREATE TABLE IF NOT EXISTS launchpads (
+    CREATE TABLE IF NOT EXISTS sales (
         id SERIAL PRIMARY KEY,
         nft_collection TEXT,
         jetton TEXT,
@@ -124,11 +124,11 @@ function authorizeAdmin(req: Request, res: Response, next: NextFunction) {
     });
 }
 
-app.post('/createLaunchpad', authorizeAdmin, async (req, res) => {
+app.post('/createSale', authorizeAdmin, async (req, res) => {
     const { nft_collection, jetton, whitelisted_users, startTime, endTime, price, available, buyerLimit, lastIndex } =
         req.body;
     try {
-        const config: LaunchpadConfig = {
+        const config: SaleConfig = {
             adminPubkey: keyPair.publicKey,
             available: BigInt(available),
             price: BigInt(price),
@@ -140,7 +140,7 @@ app.post('/createLaunchpad', authorizeAdmin, async (req, res) => {
             adminAddress: adminAddress,
         };
 
-        const contract = Launchpad.createFromConfig(config, launchpadCode);
+        const contract = Sale.createFromConfig(config, saleCode);
 
         const transferCell = adminWallet.createTransfer({
             seqno: await fetchSeqno(),
@@ -150,8 +150,8 @@ app.post('/createLaunchpad', authorizeAdmin, async (req, res) => {
                     value: '0.1',
                     to: contract.address,
                     init: {
-                        code: launchpadCode,
-                        data: launchpadConfigToCell(config),
+                        code: saleCode,
+                        data: saleConfigToCell(config),
                     },
                 }),
             ],
@@ -163,33 +163,33 @@ app.post('/createLaunchpad', authorizeAdmin, async (req, res) => {
         }
 
         const result = await pool.query(
-            'INSERT INTO launchpads (nft_collection, jetton, whitelisted_users) VALUES ($1, $2, $3) RETURNING *',
+            'INSERT INTO sales (nft_collection, jetton, whitelisted_users) VALUES ($1, $2, $3) RETURNING *',
             [nft_collection, jetton, whitelisted_users]
         );
-        const launchpadData = result.rows[0];
+        const saleData = result.rows[0];
 
-        res.json({ id: launchpadData.id, contractAddress: contract.address.toString() });
+        res.json({ id: saleData.id, contractAddress: contract.address.toString() });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.put('/removeLaunchpad/:id', authorizeAdmin, async (req, res) => {
+app.put('/removeSale/:id', authorizeAdmin, async (req, res) => {
     const { id } = req.params;
     try {
-        await pool.query('UPDATE launchpads SET status = $1 WHERE id = $2', ['inactive', id]);
-        res.json({ message: 'Marked launchpad as inactive' });
+        await pool.query('UPDATE sales SET status = $1 WHERE id = $2', ['inactive', id]);
+        res.json({ message: 'Marked sale as inactive' });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.put('/editLaunchpad/:id', authorizeAdmin, async (req, res) => {
+app.put('/editSale/:id', authorizeAdmin, async (req, res) => {
     const { id } = req.params;
     const { nft_collection, jetton, whitelisted_users } = req.body;
     try {
         const result = await pool.query(
-            'UPDATE launchpads SET nft_collection = $1, jetton = $2, whitelisted_users = $3 WHERE id = $4 RETURNING *',
+            'UPDATE sales SET nft_collection = $1, jetton = $2, whitelisted_users = $3 WHERE id = $4 RETURNING *',
             [nft_collection, jetton, whitelisted_users, id]
         );
         res.json(result.rows[0]);
@@ -202,11 +202,11 @@ app.put('/changeCollectionOwner/:id', authorizeAdmin, async (req, res) => {
     const { id } = req.params;
     const { new_owner } = req.body;
     try {
-        const result = await pool.query('SELECT * FROM launchpads WHERE id = $1', [id]);
-        const launchpad = result.rows[0];
+        const result = await pool.query('SELECT * FROM sales WHERE id = $1', [id]);
+        const sale = result.rows[0];
 
-        if (!launchpad) {
-            return res.status(404).send('Launchpad not found');
+        if (!sale) {
+            return res.status(404).send('Sale not found');
         }
 
         const newOwnerAddress = Address.parse(new_owner);
@@ -218,7 +218,7 @@ app.put('/changeCollectionOwner/:id', authorizeAdmin, async (req, res) => {
             sendMode: SendMode.PAY_GAS_SEPARATELY,
             messages: [
                 internal({
-                    to: Address.parse(launchpad.contractAddress),
+                    to: Address.parse(sale.contractAddress),
                     body: message,
                     value: toNano('0.05'),
                 }),
@@ -237,19 +237,16 @@ app.put('/changeCollectionOwner/:id', authorizeAdmin, async (req, res) => {
     }
 });
 
-app.get('/checkUser/:launchpadId', async (req, res) => {
-    const { launchpadId } = req.params;
+app.get('/checkUser/:saleId', async (req, res) => {
+    const { saleId } = req.params;
     const { address, query_id } = req.query;
 
     try {
-        const result = await pool.query('SELECT * FROM launchpads WHERE id = $1 AND status = $2', [
-            launchpadId,
-            'active',
-        ]);
-        const launchpad = result.rows[0];
+        const result = await pool.query('SELECT * FROM sales WHERE id = $1 AND status = $2', [saleId, 'active']);
+        const sale = result.rows[0];
 
-        if (!launchpad) {
-            return res.status(404).send('Launchpad not found');
+        if (!sale) {
+            return res.status(404).send('Sale not found');
         }
 
         const userAddress = Address.parse(address as string);
@@ -259,13 +256,13 @@ app.get('/checkUser/:launchpadId', async (req, res) => {
         const signature = sign(bodyCell.hash(), keyPair.secretKey);
 
         // Check if user is whitelisted
-        if (launchpad.whitelisted_users.includes(address)) {
+        if (sale.whitelisted_users.includes(address)) {
             return res.json({ access: true, signature: signature.toString('hex') });
         }
 
         // Check if user holds necessary NFT
-        if (launchpad.nft_collection) {
-            const nftAddress = Address.parse(launchpad.nft_collection);
+        if (sale.nft_collection) {
+            const nftAddress = Address.parse(sale.nft_collection);
             const hasNFT = await checkIfAddressHoldsNFT(userAddress, nftAddress);
             if (!hasNFT) {
                 return res.json({ access: false, reason: 'User does not hold the necessary NFT.' });
@@ -273,8 +270,8 @@ app.get('/checkUser/:launchpadId', async (req, res) => {
         }
 
         // Check if user holds necessary Jetton
-        if (launchpad.jetton) {
-            const jettonAddress = Address.parse(launchpad.jetton);
+        if (sale.jetton) {
+            const jettonAddress = Address.parse(sale.jetton);
             const hasJetton = await checkIfAddressHoldsJetton(userAddress, jettonAddress);
             if (!hasJetton) {
                 return res.json({ access: false, reason: 'User does not hold the necessary Jetton.' });

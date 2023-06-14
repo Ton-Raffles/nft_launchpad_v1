@@ -3,7 +3,7 @@
     "license": "MIT",
     "scripts": {
         "test": "jest",
-        "build": "yarn blueprint build Launchpad && tsc --build --clean && tsc --build",
+        "build": "yarn blueprint build Sale && tsc --build --clean && tsc --build",
         "start": "yarn build && node dist/backend/main.js"
     },
     "devDependencies": {
