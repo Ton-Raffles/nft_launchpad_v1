@@ -32,8 +32,14 @@ export class NFTItem implements Contract {
     }
 
     async getOwner(provider: ContractProvider) {
-        let stack = await (await provider.get('get_nft_data', [])).stack;
+        let stack = (await provider.get('get_nft_data', [])).stack;
         stack.skip(3);
         return stack.readAddress();
+    }
+
+    async getIndividualContent(provider: ContractProvider) {
+        let stack = (await provider.get('get_nft_data', [])).stack;
+        stack.skip(4);
+        return stack.readCell();
     }
 }

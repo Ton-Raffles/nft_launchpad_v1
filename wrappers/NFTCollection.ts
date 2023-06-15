@@ -97,4 +97,14 @@ export class NFTCollection implements Contract {
         result.skip(2);
         return result.readAddress();
     }
+
+    async getNftContent(provider: ContractProvider, index: bigint, individualContent: Cell): Promise<Cell> {
+        const result = (
+            await provider.get('get_nft_content', [
+                { type: 'int', value: index },
+                { type: 'cell', cell: individualContent },
+            ])
+        ).stack;
+        return result.readCell();
+    }
 }

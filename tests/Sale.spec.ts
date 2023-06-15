@@ -310,4 +310,19 @@ describe('Sale', () => {
             exitCode: 707,
         });
     });
+
+    it('should mint NFTs with correct content', async () => {
+        blockchain.now = 1800000000;
+        const signature = sale.signPurchase(adminKeypair, 123n, users[0].address);
+        await sale.sendPurchase(users[0].getSender(), toNano('12'), 5n, signature, 123n, users[0].address);
+
+        const nft = blockchain.openContract(await collection.getNftItemByIndex(2n));
+        expect(await collection.getNftContent(2n, await nft.getIndividualContent())).toEqualCell(
+            beginCell()
+                .storeUint(1, 8)
+                .storeStringTail('test.com/nft/')
+                .storeRef(beginCell().storeStringTail('2.json').endCell())
+                .endCell()
+        );
+    });
 });
