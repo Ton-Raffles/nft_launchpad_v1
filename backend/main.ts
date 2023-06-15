@@ -4,13 +4,22 @@ import jwt, { JwtPayload } from 'jsonwebtoken';
 import { Pool } from 'pg';
 import { config } from 'dotenv';
 import { keyPairFromSecretKey, sign } from 'ton-crypto';
-import { Address, Cell, SendMode, WalletContractV3R2, beginCell, internal, toNano } from 'ton';
+import { Address, Cell, SendMode, WalletContractV3R2, beginCell, internal, toNano, TonClient } from 'ton';
 import { Sale, SaleConfig, saleConfigToCell } from '../wrappers/Sale';
 import * as fs from 'fs';
+import cors from 'cors';
 
 config();
 
 const app = express();
+app.use(cors());
+app.use(express.json());
+
+const client = new TonClient({
+    endpoint: 'https://toncenter.com/api/v2/jsonRPC',
+    apiKey: process.env.TONCENTER_KEY,
+});
+
 const keyPair = keyPairFromSecretKey(Buffer.from(process.env.ADMIN_SECRET_KEY!, 'hex'));
 const endpoint = process.env.TONAPI_ENDPOINT;
 const tonApiKey = process.env.TONAPI_KEY!;
@@ -18,8 +27,10 @@ const jwtSecretKey = process.env.JWT_ADMIN!;
 const saleCode = Cell.fromBoc(
     Buffer.from(JSON.parse(fs.readFileSync('./build/Sale.compiled.json').toString('utf-8')).hex, 'hex')
 )[0];
-const adminWallet = WalletContractV3R2.create({ workchain: 0, publicKey: keyPair.publicKey });
-const adminAddress = adminWallet.address;
+const adminSender = client
+    .open(WalletContractV3R2.create({ workchain: 0, publicKey: keyPair.publicKey }))
+    .sender(keyPair.secretKey);
+const adminAddress = adminSender.address!;
 
 const pool = new Pool({
     user: process.env.PGUSER,
@@ -76,31 +87,6 @@ async function checkIfAddressHoldsJetton(address: Address, jetton: Address): Pro
     return balances.balance! != '0';
 }
 
-// This function checks whether user has positive balance of specific Jetton
-async function sendRawMessage(message: Cell): Promise<[number, any[]]> {
-    const result = await axios.post(endpoint + '/v2/blockchain/message', {
-        headers: {
-            Authorization: 'Bearer ' + tonApiKey,
-        },
-        data: {
-            boc: message.toBoc(),
-        },
-    });
-    return [result.status, result.data];
-}
-
-// This function fetches the latest seqno for admin wallet
-async function fetchSeqno(): Promise<number> {
-    const result = await axios.get(endpoint + `/v2/blockchain/accounts/${adminAddress.toRawString()}/methods/seqno`, {
-        headers: {
-            Authorization: 'Bearer ' + tonApiKey,
-        },
-    });
-    const hexSeqno = result.data.stack[0].num;
-    const decSeqno = parseInt(hexSeqno, 16);
-    return decSeqno;
-}
-
 function authorizeAdmin(req: Request, res: Response, next: NextFunction) {
     const authHeader = req.headers.authorization;
 
@@ -137,30 +123,12 @@ app.post('/createSale', authorizeAdmin, async (req, res) => {
             buyerLimit: BigInt(buyerLimit),
             startTime: BigInt(startTime),
             endTime: BigInt(endTime),
-            adminAddress: adminAddress,
+            adminAddress,
         };
 
-        const contract = Sale.createFromConfig(config, saleCode);
+        const contract = client.open(Sale.createFromConfig(config, saleCode));
 
-        const transferCell = adminWallet.createTransfer({
-            seqno: await fetchSeqno(),
-            secretKey: keyPair.secretKey,
-            messages: [
-                internal({
-                    value: '0.1',
-                    to: contract.address,
-                    init: {
-                        code: saleCode,
-                        data: saleConfigToCell(config),
-                    },
-                }),
-            ],
-        });
-
-        const [status, error] = await sendRawMessage(transferCell);
-        if (status != 200) {
-            res.status(status).json({ error });
-        }
+        await contract.sendDeploy(adminSender, toNano('0.05'));
 
         const result = await pool.query(
             'INSERT INTO sales (nft_collection, jetton, whitelisted_users) VALUES ($1, $2, $3) RETURNING *',
@@ -170,6 +138,7 @@ app.post('/createSale', authorizeAdmin, async (req, res) => {
 
         res.json({ id: saleData.id, contractAddress: contract.address.toString() });
     } catch (err: any) {
+        console.log(err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -210,26 +179,10 @@ app.put('/changeCollectionOwner/:id', authorizeAdmin, async (req, res) => {
         }
 
         const newOwnerAddress = Address.parse(new_owner);
-        const message = beginCell().storeUint(0x379ef53b, 32).storeAddress(newOwnerAddress).endCell();
 
-        const callMessage = adminWallet.createTransfer({
-            seqno: await fetchSeqno(),
-            secretKey: keyPair.secretKey,
-            sendMode: SendMode.PAY_GAS_SEPARATELY,
-            messages: [
-                internal({
-                    to: Address.parse(sale.contractAddress),
-                    body: message,
-                    value: toNano('0.05'),
-                }),
-            ],
-        });
+        const contract = client.open(Sale.createFromAddress(Address.parse(sale.address)));
 
-        const [status, error] = await sendRawMessage(callMessage);
-        if (status != 200) {
-            res.status(status).json({ error });
-            return;
-        }
+        await contract.sendChangeCollectionOwner(adminSender, toNano('0.05'), newOwnerAddress);
 
         res.json({ message: 'Changed collection owner' });
     } catch (err: any) {
@@ -316,10 +269,10 @@ app.get('/sale/:id', async (req, res) => {
 // This endpoint returns all inactive sales.
 app.get('/sales/history', async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM sales WHERE status = $1', ['inactive']);
+        const result = await pool.query('SELECT * FROM sales');
         const sales = result.rows;
         if (sales.length == 0) {
-            return res.status(404).send('No inactive sales found');
+            return res.status(404).send('No sales found');
         }
         res.json(sales);
     } catch (err: any) {
