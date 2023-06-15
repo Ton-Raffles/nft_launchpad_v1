@@ -284,6 +284,49 @@ app.get('/checkUser/:saleId', async (req, res) => {
     }
 });
 
+// This endpoint returns all active sales.
+app.get('/sales', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM sales WHERE status = $1', ['active']);
+        const sales = result.rows;
+        if (sales.length == 0) {
+            return res.status(404).send('No active sales found');
+        }
+        res.json(sales);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// This endpoint returns the details of a specific sale.
+app.get('/sale/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await pool.query('SELECT * FROM sales WHERE id = $1', [id]);
+        const sale = result.rows[0];
+        if (!sale) {
+            return res.status(404).send('Sale not found');
+        }
+        res.json(sale);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// This endpoint returns all inactive sales.
+app.get('/sales/history', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM sales WHERE status = $1', ['inactive']);
+        const sales = result.rows;
+        if (sales.length == 0) {
+            return res.status(404).send('No inactive sales found');
+        }
+        res.json(sales);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.listen(process.env.PORT!, () => {
     console.log(`API is listening on port ${process.env.PORT!}`);
 });
