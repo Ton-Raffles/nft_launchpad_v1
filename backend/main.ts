@@ -12,7 +12,6 @@ config();
 
 const app = express();
 const keyPair = keyPairFromSecretKey(Buffer.from(process.env.ADMIN_SECRET_KEY!, 'hex'));
-const adminAddress = Address.parse(process.env.ADMIN_ADDRESS!);
 const endpoint = process.env.TONAPI_ENDPOINT;
 const tonApiKey = process.env.TONAPI_KEY!;
 const jwtSecretKey = process.env.JWT_ADMIN!;
@@ -20,6 +19,7 @@ const saleCode = Cell.fromBoc(
     Buffer.from(JSON.parse(fs.readFileSync('./build/Sale.compiled.json').toString('utf-8')).hex, 'hex')
 )[0];
 const adminWallet = WalletContractV3R2.create({ workchain: 0, publicKey: keyPair.publicKey });
+const adminAddress = adminWallet.address;
 
 const pool = new Pool({
     user: process.env.PGUSER,
