@@ -112,8 +112,18 @@ function authorizeAdmin(req: Request, res: Response, next: NextFunction) {
 }
 
 app.post('/createSale', authorizeAdmin, async (req, res) => {
-    const { nft_collection, jetton, whitelisted_users, startTime, endTime, price, available, buyerLimit, lastIndex } =
-        req.body;
+    const {
+        nft_collection,
+        jetton,
+        whitelisted_users,
+        startTime,
+        endTime,
+        price,
+        available,
+        buyerLimit,
+        lastIndex,
+        launch_id,
+    } = req.body;
     try {
         const config: SaleConfig = {
             adminPubkey: keyPair.publicKey,
@@ -132,8 +142,8 @@ app.post('/createSale', authorizeAdmin, async (req, res) => {
         await contract.sendDeploy(adminSender, toNano('0.05'));
 
         const result = await pool.query(
-            'INSERT INTO sales (nft_collection, jetton, whitelisted_users) VALUES ($1, $2, $3) RETURNING *',
-            [nft_collection, jetton, whitelisted_users]
+            'INSERT INTO sales (nft_collection, jetton, whitelisted_users, launch_id) VALUES ($1, $2, $3, $4) RETURNING *',
+            [nft_collection, jetton, whitelisted_users, launch_id]
         );
         const saleData = result.rows[0];
 
