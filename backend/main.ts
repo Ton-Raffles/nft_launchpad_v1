@@ -43,6 +43,7 @@ const pool = new Pool({
 pool.query(`
     CREATE TABLE IF NOT EXISTS sales (
         id SERIAL PRIMARY KEY,
+        launch_id INTEGER,
         nft_collection TEXT,
         jetton TEXT,
         whitelisted_users text[],
@@ -274,6 +275,18 @@ app.get('/sales/history', async (req, res) => {
         if (sales.length == 0) {
             return res.status(404).send('No sales found');
         }
+        res.json(sales);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// This endpoint returns all sales of specific launch.
+app.get('/sales/launch/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await pool.query('SELECT * FROM sales WHERE launch_id = $1', [id]);
+        const sales = result.rows;
         res.json(sales);
     } catch (err: any) {
         res.status(500).json({ error: err.message });
