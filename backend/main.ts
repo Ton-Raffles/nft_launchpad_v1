@@ -27,10 +27,9 @@ const jwtSecretKey = process.env.JWT_ADMIN!;
 const saleCode = Cell.fromBoc(
     Buffer.from(JSON.parse(fs.readFileSync('./build/Sale.compiled.json').toString('utf-8')).hex, 'hex')
 )[0];
-const adminSender = client
-    .open(WalletContractV3R2.create({ workchain: 0, publicKey: keyPair.publicKey }))
-    .sender(keyPair.secretKey);
-const adminAddress = adminSender.address!;
+const adminWallet = WalletContractV3R2.create({ workchain: 0, publicKey: keyPair.publicKey });
+const adminSender = client.open(adminWallet).sender(keyPair.secretKey);
+const adminAddress = adminWallet.address;
 
 const pool = new Pool({
     user: process.env.PGUSER,
@@ -113,6 +112,7 @@ function authorizeAdmin(req: Request, res: Response, next: NextFunction) {
 
 app.post('/createSale', authorizeAdmin, async (req, res) => {
     const {
+        saleCollection,
         nft_collection,
         jetton,
         whitelisted_users,
@@ -130,7 +130,7 @@ app.post('/createSale', authorizeAdmin, async (req, res) => {
             available: BigInt(available),
             price: BigInt(price),
             lastIndex: BigInt(lastIndex),
-            collection: Address.parse(nft_collection),
+            collection: Address.parse(saleCollection),
             buyerLimit: BigInt(buyerLimit),
             startTime: BigInt(startTime),
             endTime: BigInt(endTime),
