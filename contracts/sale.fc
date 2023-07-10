@@ -1,63 +1,49 @@
 #include "imports/stdlib.fc";
+#include "constants.fc";
 
-global int admin_pubkey;
-global int available;
-global int price;
-global int last_index;
-global slice collection;
-global int buyer_limit;
-global cell buyers;
-global int start_time;
-global int end_time;
-global slice admin_address;
-global int active?;
+global int data::admin_pubkey;
+global int data::available;
+global int data::price;
+global int data::last_index;
+global slice data::collection;
+global int data::buyer_limit;
+global int data::start_time;
+global int data::end_time;
+global slice data::admin_address;
+global int data::active;
+global cell data::helper_code;
 
 global int query_id;
 global slice sender;
 
-const int op::purchase = 0x4c56b6b5;
-const int op::change_collection_owner = 0x379ef53b;
-
-const int const::fees = 60000000;
-const int const::deploy_value = 50000000;
-const int const::fwd_fees = 20000000;
-
-const int error::invalid_signature = 701;
-const int error::wrong_sender = 702;
-const int error::not_enough_value = 703;
-const int error::wrong_time = 704;
-const int error::zero_purchase = 705;
-const int error::wrong_workchain = 706;
-const int error::inactive = 707;
-
 () load_data() impure {
     slice ds = get_data().begin_parse();
-    admin_pubkey = ds~load_uint(256);
-    available = ds~load_uint(32);
-    price = ds~load_coins();
-    last_index = ds~load_uint(32);
-    collection = ds~load_msg_addr();
-    buyer_limit = ds~load_uint(32);
-    buyers = ds~load_dict();
-    start_time = ds~load_uint(32);
-    end_time = ds~load_uint(32);
-    admin_address = ds~load_msg_addr();
-    active? = ds~load_int(1);
+    data::admin_pubkey = ds~load_uint(256);
+    data::available = ds~load_uint(32);
+    data::price = ds~load_coins();
+    data::last_index = ds~load_uint(32);
+    data::collection = ds~load_msg_addr();
+    data::buyer_limit = ds~load_uint(32);
+    data::start_time = ds~load_uint(32);
+    data::end_time = ds~load_uint(32);
+    data::admin_address = ds~load_msg_addr();
+    data::active = ds~load_int(1);
+    data::helper_code = ds~load_ref();
 }
 
 () save_data() impure {
     set_data(begin_cell()
-        .store_uint(admin_pubkey, 256)
-        .store_uint(available, 32)
-        .store_coins(price)
-        .store_uint(last_index, 32)
-        .store_slice(collection)
-        .store_uint(buyer_limit, 32)
-        .store_dict(buyers)
-        .store_uint(start_time, 32)
-        .store_uint(end_time, 32)
-        .store_slice(admin_address)
-        .store_int(active?, 1)
+        .store_uint(data::admin_pubkey, 256)
+        .store_uint(data::available, 32)
+        .store_coins(data::price)
+        .store_uint(data::last_index, 32)
+        .store_slice(data::collection)
+        .store_uint(data::buyer_limit, 32)
+        .store_uint(data::start_time, 32)
+        .store_uint(data::end_time, 32)
+        .store_slice(data::admin_address)
+        .store_int(data::active, 1)
+        .store_ref(data::helper_code)
     .end_cell());
 }
 
@@ -76,117 +62,159 @@ const int error::inactive = 707;
     REPEAT:<{ 8 STU }>
 """;
 
-() mint(int quantity) impure {
-    while (quantity > 0) {
-        cell nfts = new_dict();
-        int N = min(quantity, 250);
-        repeat (N) {
-            nfts~udict_set(64, last_index, begin_cell()
-                .store_coins(const::deploy_value)
-                .store_ref(begin_cell()
-                    .store_slice(sender)
-                    .store_ref(begin_cell()
-                        .store_int_as_string(last_index)
-                        .store_slice(".json")
-                    .end_cell())
-                .end_cell())
-            .end_cell().begin_parse());
-            last_index += 1;
-        }
-        
-        send_raw_message(begin_cell()
-            .store_uint(0x18, 6)
-            .store_slice(collection)
-            .store_coins(const::fees * (N + 1))
-            .store_uint(0, 107)
-            .store_uint(2, 32)
-            .store_uint(query_id, 64)
-            .store_ref(nfts)
-        .end_cell(), 1);
+(cell) calculate_helper_stateinit(slice user) {
+    return begin_cell()
+        .store_uint(0, 2)
+        .store_dict(data::helper_code)
+        .store_dict(begin_cell()
+            .store_slice(my_address())
+            .store_slice(user)
+            .store_uint(data::buyer_limit, 32)
+        .end_cell())
+        .store_uint(0, 1)
+    .end_cell();
+}
 
-        quantity -= 250;
+(slice) calculate_helper_address(cell stateinit) {
+    return begin_cell()
+        .store_uint(4, 3)
+        .store_int(0, 8)
+        .store_uint(cell_hash(stateinit), 256)
+    .end_cell().begin_parse();
+}
+
+() mint(slice user, int quantity) impure {
+    cell nfts = new_dict();
+    repeat (quantity) {
+        nfts~udict_set(64, data::last_index, begin_cell()
+            .store_coins(const::deploy_value)
+            .store_ref(begin_cell()
+                .store_slice(user)
+                .store_ref(begin_cell()
+                    .store_int_as_string(data::last_index)
+                    .store_slice(".json")
+                .end_cell())
+            .end_cell())
+        .end_cell().begin_parse());
+        data::last_index += 1;
     }
+    
+    send_raw_message(begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(data::collection)
+        .store_coins((const::fees + const::deploy_value) * quantity)
+        .store_uint(0, 107)
+        .store_uint(2, 32)
+        .store_uint(query_id, 64)
+        .store_ref(nfts)
+    .end_cell(), 1);
+}
+
+() check(slice user, int quantity) impure {
+    cell helper_stateinit = calculate_helper_stateinit(user);
+    send_raw_message(begin_cell()
+        .store_uint(0x18, 6)
+        .store_slice(calculate_helper_address(helper_stateinit))
+        .store_coins(0)
+        .store_uint(4 + 2, 108)
+        .store_ref(helper_stateinit)
+        .store_uint(op::purchase_check, 32)
+        .store_uint(query_id, 64)
+        .store_uint(quantity, 16)
+    .end_cell(), 64);
 }
 
 () recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
     slice cs = in_msg_full.begin_parse();
     int flags = cs~load_uint(4);
-    if ((flags & 1) | in_msg_body.slice_empty?()) {
+    if ((flags & 1) | in_msg_body.slice_bits() < 32) {
         return ();
     }
     sender = cs~load_msg_addr();
     load_data();
 
-    throw_unless(error::inactive, active?);
+    throw_unless(error::inactive, data::active);
 
     int op = in_msg_body~load_uint(32);
 
     if (op == op::purchase) {
-        throw_unless(error::wrong_time, (now() >= start_time) & (now() <= end_time));
+        throw_unless(error::wrong_time, (now() >= data::start_time) & (now() <= data::end_time));
 
-        int quantity = in_msg_body~load_uint(16);
-        slice signature = in_msg_body~load_bits(512);
-        throw_unless(error::invalid_signature, check_signature(slice_hash(in_msg_body), signature, admin_pubkey));
         query_id = in_msg_body~load_uint(64);
-        slice user = in_msg_body~load_msg_addr();
-        throw_unless(error::wrong_sender, equal_slices(sender, user));
-        (int workchain, int account_id) = parse_std_addr(user);
+        int quantity = in_msg_body~load_uint(16);
+
+        throw_unless(error::too_many_items, quantity <= 100);
+
+        int value = quantity * (data::price + const::deploy_value + const::fees * 2) + const::base_fees;
+        throw_unless(error::not_enough_value, msg_value >= value);
+
+        int time = in_msg_body~load_uint(64);
+        throw_if(error::signature_expired, now() > time + 600);
+        slice signature = in_msg_body~load_bits(512);
+        throw_unless(error::invalid_signature, check_signature(
+            slice_hash(begin_cell().store_slice(sender).store_uint(time, 64).end_cell().begin_parse()),
+            signature,
+            data::admin_pubkey
+        ));
+        (int workchain, int account_id) = parse_std_addr(sender);
         throw_unless(error::wrong_workchain, workchain == 0);
 
-        if (quantity > available) {
-            quantity = available;
+        check(sender, quantity);
+    }
+
+    elseif (op == op::purchase_confirm) {
+        query_id = in_msg_body~load_uint(64);
+        int quantity = in_msg_body~load_uint(16);
+        slice user = in_msg_body~load_msg_addr();
+
+        throw_unless(error::wrong_sender, equal_slices(sender, calculate_helper_address(calculate_helper_stateinit(user))));
+
+        if (quantity > data::available) {
+            quantity = data::available;
         }
-        (slice v, int f?) = buyers.udict_get?(256, account_id);
-        int buyer_bought = 0;
-        if (f?) {
-            buyer_bought = v~load_uint(32);
-        }
-        if (quantity > (buyer_limit - buyer_bought)) {
-            quantity = buyer_limit - buyer_bought;
-        }
+
         throw_unless(error::zero_purchase, quantity > 0);
 
-        int value = (const::fees * 2 * ((quantity + 249) / 250)) + (quantity * (price + const::deploy_value));
+        int value = quantity * (data::price + const::deploy_value + const::fees * 2) + const::base_fees;
+
         throw_unless(error::not_enough_value, msg_value >= value);
-        available -= quantity;
-        buyers~udict_set(256, account_id, begin_cell().store_uint(buyer_bought + quantity, 32).end_cell().begin_parse());
+        data::available -= quantity;
 
-        mint(quantity);
+        mint(user, quantity);
 
-        if (msg_value - value > const::fwd_fees) {
+        if (msg_value - value > const::fees) {
             send_raw_message(begin_cell()
-                .store_uint(0x18, 6)
-                .store_slice(sender)
+                .store_uint(0x10, 6)
+                .store_slice(user)
                 .store_coins(msg_value - value)
                 .store_uint(0, 107)
             .end_cell(), 0);
         }
 
-        if (quantity * price > 0) {
+        if (data::price > 0) {
             send_raw_message(begin_cell()
-                .store_uint(0x18, 6)
-                .store_slice(admin_address)
-                .store_coins(quantity * price)
+                .store_uint(0x10, 6)
+                .store_slice(data::admin_address)
+                .store_coins(quantity * data::price)
                 .store_uint(0, 107)
             .end_cell(), 1);
         }
-
-        save_data();
     }
 
     elseif (op == op::change_collection_owner) {
-        throw_unless(error::wrong_sender, equal_slices(sender, admin_address)); ;; Only admin can change the collection owner
+        throw_unless(error::wrong_sender, equal_slices(sender, data::admin_address)); ;; Only admin can change the data::collection owner
         slice new_owner = in_msg_body~load_msg_addr();
         send_raw_message(begin_cell()
             .store_uint(0x18, 6)
-            .store_slice(collection)
+            .store_slice(data::collection)
             .store_coins(0)
             .store_uint(0, 107)
             .store_uint(3, 32)
             .store_uint(0, 64)
             .store_slice(new_owner)
         .end_cell(), 64);
-        active? = 0;
-        save_data();
+        data::active = 0;
     }
+
+    save_data();
 }

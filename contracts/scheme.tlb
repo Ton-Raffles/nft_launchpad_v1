@@ -1,4 +1,7 @@
-#_ admin_pubkey:uint256 available:uint32 price:Coins last_index:uint32 collection:MsgAddressInt buyer_limit:uint32 buyers:(HashmapE 256 uint32) start_time:uint32 end_time:uint32 = SaleStorage;
+_ admin_pubkey:uint256 available:uint32 price:Coins last_index:uint32 collection:MsgAddressInt buyer_limit:uint32 start_time:uint32 end_time:uint32 admin_address:MsgAddressInt active:Bool helper_code:^Cell = SaleStorage;
+_ sale:MsgAddressInt user:MsgAddressInt available:uint32 = HelperStorage;
 
-purchase#4c56b6b5 quantity:uint16 signature:bits512 query_id:uint64 user:MsgAddressInt = InternalMsgBody;
-change_collection_owner#379ef53b new_owner:MsgAddressInt = InternalMsgBody;
+purchase#26c6f3d0 query_id:uint64 quantity:uint16 time:uint64 signature:bits512 = InternalMsgBody;
+change_collection_owner#49a4bbf6 new_owner:MsgAddressInt = InternalMsgBody;
+purchase_check#492ef905 query_id:uint64 quantity:uint16 = InternalMsgBody;
+purchase_confirm#d51543b9 query_id:uint64 quantity:uint16 user:MsgAddressInt = InternalMsgBody;

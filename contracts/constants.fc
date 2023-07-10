@@ -1,0 +1,19 @@
+const int op::purchase = 0x26c6f3d0;
+const int op::change_collection_owner = 0x49a4bbf6;
+const int op::purchase_check = 0x492ef905;
+const int op::purchase_confirm = 0xd51543b9;
+const int op::bounced = 0xffffffff;
+
+const int const::base_fees = 50000000;
+const int const::fees = 20000000;
+const int const::deploy_value = 10000000;
+
+const int error::invalid_signature = 701;
+const int error::wrong_sender = 702;
+const int error::not_enough_value = 703;
+const int error::wrong_time = 704;
+const int error::zero_purchase = 705;
+const int error::wrong_workchain = 706;
+const int error::inactive = 707;
+const int error::signature_expired = 708;
+const int error::too_many_items = 709;

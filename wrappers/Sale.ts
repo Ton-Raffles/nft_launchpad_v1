@@ -8,10 +8,10 @@ export type SaleConfig = {
     lastIndex: bigint;
     collection: Address;
     buyerLimit: bigint;
-    buyers?: Cell;
     startTime: bigint;
     endTime: bigint;
     adminAddress: Address;
+    helperCode: Cell;
 };
 
 export function saleConfigToCell(config: SaleConfig): Cell {
@@ -22,11 +22,11 @@ export function saleConfigToCell(config: SaleConfig): Cell {
         .storeUint(config.lastIndex, 32)
         .storeAddress(config.collection)
         .storeUint(config.buyerLimit, 32)
-        .storeMaybeRef(config.buyers)
         .storeUint(config.startTime, 32)
         .storeUint(config.endTime, 32)
         .storeAddress(config.adminAddress)
         .storeUint(1, 1)
+        .storeRef(config.helperCode)
         .storeUint(Math.floor(Math.random() * 10000), 16)
         .endCell();
 }
@@ -44,8 +44,8 @@ export class Sale implements Contract {
         return new Sale(contractAddress(workchain, init), init);
     }
 
-    signPurchase(admin: KeyPair, queryId: bigint, user: Address): Buffer {
-        const body = beginCell().storeUint(queryId, 64).storeAddress(user).endCell();
+    signPurchase(admin: KeyPair, user: Address, time: bigint): Buffer {
+        const body = beginCell().storeAddress(user).storeUint(time, 64).endCell();
         return sign(body.hash(), admin.secretKey);
     }
 
@@ -61,20 +61,20 @@ export class Sale implements Contract {
         provider: ContractProvider,
         via: Sender,
         value: bigint,
-        quantity: bigint,
-        signature: Buffer,
         queryId: bigint,
-        user: Address
+        quantity: bigint,
+        time: bigint,
+        signature: Buffer
     ) {
         await provider.internal(via, {
             value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
             body: beginCell()
-                .storeUint(0x4c56b6b5, 32)
-                .storeUint(quantity, 16)
-                .storeBuffer(signature, 64)
+                .storeUint(0x26c6f3d0, 32)
                 .storeUint(queryId, 64)
-                .storeAddress(user)
+                .storeUint(quantity, 16)
+                .storeUint(time, 64)
+                .storeBuffer(signature, 64)
                 .endCell(),
         });
     }
@@ -83,7 +83,7 @@ export class Sale implements Contract {
         await provider.internal(via, {
             value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
-            body: beginCell().storeUint(0x379ef53b, 32).storeAddress(newOwner).endCell(),
+            body: beginCell().storeUint(0x49a4bbf6, 32).storeAddress(newOwner).endCell(),
         });
     }
 }

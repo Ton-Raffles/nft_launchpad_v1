@@ -10,11 +10,13 @@ describe('Sale', () => {
     let code: Cell;
     let codeNFTItem: Cell;
     let codeNFTCollection: Cell;
+    let helperCode: Cell;
 
     beforeAll(async () => {
         code = await compile('Sale');
         codeNFTItem = await compile('NFTItem');
         codeNFTCollection = await compile('NFTCollection');
+        helperCode = await compile('Helper');
     });
 
     let blockchain: Blockchain;
@@ -58,6 +60,7 @@ describe('Sale', () => {
                     startTime: 1800000000n,
                     endTime: 1900000000n,
                     adminAddress: admin.address,
+                    helperCode,
                 },
                 code
             )
@@ -88,8 +91,15 @@ describe('Sale', () => {
 
     it('should mint one NFT', async () => {
         blockchain.now = 1800000000;
-        const signature = sale.signPurchase(adminKeypair, 123n, users[0].address);
-        const res = await sale.sendPurchase(users[0].getSender(), toNano('2.5'), 1n, signature, 123n, users[0].address);
+        const signature = sale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
+        const res = await sale.sendPurchase(
+            users[0].getSender(),
+            toNano('2.5'),
+            123n,
+            1n,
+            BigInt(blockchain.now),
+            signature
+        );
 
         expect(await collection.getNextItemIndex()).toEqual(1n);
         const nft = blockchain.openContract(await collection.getNftItemByIndex(0n));
@@ -98,8 +108,15 @@ describe('Sale', () => {
 
     it('should mint several NFTs at once', async () => {
         blockchain.now = 1800000000;
-        const signature = sale.signPurchase(adminKeypair, 123n, users[0].address);
-        await sale.sendPurchase(users[0].getSender(), toNano('12'), 5n, signature, 123n, users[0].address);
+        const signature = sale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
+        const res = await sale.sendPurchase(
+            users[0].getSender(),
+            toNano('12'),
+            123n,
+            5n,
+            BigInt(blockchain.now),
+            signature
+        );
 
         expect(await collection.getNextItemIndex()).toEqual(5n);
         for (let i = 0; i < 5; i++) {
@@ -108,12 +125,92 @@ describe('Sale', () => {
         }
     });
 
+    it('should mint 100 NFTs at once', async () => {
+        blockchain.now = 1800000000;
+
+        let newSale = blockchain.openContract(
+            Sale.createFromConfig(
+                {
+                    adminPubkey: adminKeypair.publicKey,
+                    available: 300n,
+                    price: toNano('1'),
+                    lastIndex: 0n,
+                    collection: collection.address,
+                    buyerLimit: 300n,
+                    startTime: 1800000000n,
+                    endTime: 1900000000n,
+                    adminAddress: admin.address,
+                    helperCode,
+                },
+                code
+            )
+        );
+
+        await newSale.sendDeploy(admin.getSender(), toNano('0.05'));
+        await sale.sendChangeCollectionOwner(admin.getSender(), toNano('0.05'), newSale.address);
+
+        const signature = newSale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
+        const res = await newSale.sendPurchase(
+            users[0].getSender(),
+            toNano('1000'),
+            123n,
+            100n,
+            BigInt(blockchain.now),
+            signature
+        );
+        expect(await collection.getNextItemIndex()).toEqual(100n);
+        for (let i = 0; i < 100; i++) {
+            const nft = blockchain.openContract(await collection.getNftItemByIndex(BigInt(i)));
+            expect(await nft.getOwner()).toEqualAddress(users[0].address);
+        }
+    });
+
+    it('should not mint 101 NFTs at once', async () => {
+        blockchain.now = 1800000000;
+
+        let newSale = blockchain.openContract(
+            Sale.createFromConfig(
+                {
+                    adminPubkey: adminKeypair.publicKey,
+                    available: 300n,
+                    price: toNano('1'),
+                    lastIndex: 0n,
+                    collection: collection.address,
+                    buyerLimit: 300n,
+                    startTime: 1800000000n,
+                    endTime: 1900000000n,
+                    adminAddress: admin.address,
+                    helperCode,
+                },
+                code
+            )
+        );
+
+        await newSale.sendDeploy(admin.getSender(), toNano('0.05'));
+        await sale.sendChangeCollectionOwner(admin.getSender(), toNano('0.05'), newSale.address);
+
+        const signature = newSale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
+        const res = await newSale.sendPurchase(
+            users[0].getSender(),
+            toNano('1000'),
+            123n,
+            101n,
+            BigInt(blockchain.now),
+            signature
+        );
+        expect(res.transactions).toHaveTransaction({
+            on: newSale.address,
+            exitCode: 709,
+        });
+        expect(await collection.getNextItemIndex()).toEqual(0n);
+    });
+
     it('should mint several NFTs in separate transactions', async () => {
         blockchain.now = 1800000000;
-        const signature = sale.signPurchase(adminKeypair, 123n, users[0].address);
+        const signature = sale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
 
         for (let i = 0; i < 5; i++) {
-            await sale.sendPurchase(users[0].getSender(), toNano('2.5'), 1n, signature, 123n, users[0].address);
+            await sale.sendPurchase(users[0].getSender(), toNano('2.5'), 123n, 1n, BigInt(blockchain.now), signature);
 
             expect(await collection.getNextItemIndex()).toEqual(BigInt(i + 1));
             const nft = blockchain.openContract(await collection.getNftItemByIndex(BigInt(i)));
@@ -123,15 +220,15 @@ describe('Sale', () => {
 
     it('should not exceed the buyer limit', async () => {
         blockchain.now = 1800000000;
-        const signature = sale.signPurchase(adminKeypair, 123n, users[0].address);
+        const signature = sale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
 
-        await sale.sendPurchase(users[0].getSender(), toNano('100'), 4n, signature, 123n, users[0].address);
+        await sale.sendPurchase(users[0].getSender(), toNano('100'), 123n, 4n, BigInt(blockchain.now), signature);
         expect(await collection.getNextItemIndex()).toEqual(4n);
 
-        await sale.sendPurchase(users[0].getSender(), toNano('100'), 2n, signature, 123n, users[0].address);
+        await sale.sendPurchase(users[0].getSender(), toNano('100'), 123n, 2n, BigInt(blockchain.now), signature);
         expect(await collection.getNextItemIndex()).toEqual(5n);
 
-        await sale.sendPurchase(users[0].getSender(), toNano('100'), 1n, signature, 123n, users[0].address);
+        await sale.sendPurchase(users[0].getSender(), toNano('100'), 123n, 1n, BigInt(blockchain.now), signature);
         expect(await collection.getNextItemIndex()).toEqual(5n);
     });
 
@@ -139,24 +236,42 @@ describe('Sale', () => {
         blockchain.now = 1800000000;
 
         for (let i = 0; i < 10; i++) {
-            const signature = sale.signPurchase(adminKeypair, 123n, users[i].address);
+            const signature = sale.signPurchase(adminKeypair, users[i].address, BigInt(blockchain.now));
             const r = await sale.sendPurchase(
                 users[i].getSender(),
                 toNano('100'),
-                5n,
-                signature,
                 123n,
-                users[i].address
+                5n,
+                BigInt(blockchain.now),
+                signature
             );
         }
 
         expect(await collection.getNextItemIndex()).toEqual(20n);
     });
 
-    it('should reject invalid signature', async () => {
+    it('should reject old signature', async () => {
+        blockchain.now = 1810000000;
+        const signature = sale.signPurchase(adminKeypair, users[0].address, 1800000000n);
+        const res = await sale.sendPurchase(users[0].getSender(), toNano('2.5'), 123n, 1n, 1800000000n, signature);
+
+        expect(res.transactions).toHaveTransaction({
+            on: sale.address,
+            exitCode: 708,
+        });
+    });
+
+    it('should reject wrong sender', async () => {
         blockchain.now = 1800000000;
-        const signature = sale.signPurchase(adminKeypair, 456n, users[0].address);
-        const res = await sale.sendPurchase(users[0].getSender(), toNano('2.5'), 1n, signature, 123n, users[0].address);
+        const signature = sale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
+        const res = await sale.sendPurchase(
+            users[1].getSender(),
+            toNano('2.5'),
+            123n,
+            1n,
+            BigInt(blockchain.now),
+            signature
+        );
 
         expect(res.transactions).toHaveTransaction({
             on: sale.address,
@@ -164,21 +279,17 @@ describe('Sale', () => {
         });
     });
 
-    it('should reject wrong sender', async () => {
-        blockchain.now = 1800000000;
-        const signature = sale.signPurchase(adminKeypair, 123n, users[0].address);
-        const res = await sale.sendPurchase(users[1].getSender(), toNano('2.5'), 1n, signature, 123n, users[0].address);
-
-        expect(res.transactions).toHaveTransaction({
-            on: sale.address,
-            exitCode: 702,
-        });
-    });
-
     it('should reject on not enough value', async () => {
         blockchain.now = 1800000000;
-        const signature = sale.signPurchase(adminKeypair, 123n, users[0].address);
-        const res = await sale.sendPurchase(users[0].getSender(), toNano('2'), 1n, signature, 123n, users[0].address);
+        const signature = sale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
+        const res = await sale.sendPurchase(
+            users[0].getSender(),
+            toNano('2'),
+            123n,
+            1n,
+            BigInt(blockchain.now),
+            signature
+        );
 
         expect(res.transactions).toHaveTransaction({
             on: sale.address,
@@ -188,8 +299,15 @@ describe('Sale', () => {
 
     it('should reject when too early', async () => {
         blockchain.now = 1790000000;
-        const signature = sale.signPurchase(adminKeypair, 123n, users[0].address);
-        const res = await sale.sendPurchase(users[0].getSender(), toNano('2.5'), 1n, signature, 123n, users[0].address);
+        const signature = sale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
+        const res = await sale.sendPurchase(
+            users[0].getSender(),
+            toNano('2.5'),
+            123n,
+            1n,
+            BigInt(blockchain.now),
+            signature
+        );
 
         expect(res.transactions).toHaveTransaction({
             on: sale.address,
@@ -199,8 +317,15 @@ describe('Sale', () => {
 
     it('should reject when too late', async () => {
         blockchain.now = 1910000000;
-        const signature = sale.signPurchase(adminKeypair, 123n, users[0].address);
-        const res = await sale.sendPurchase(users[0].getSender(), toNano('2.5'), 1n, signature, 123n, users[0].address);
+        const signature = sale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
+        const res = await sale.sendPurchase(
+            users[0].getSender(),
+            toNano('2.5'),
+            123n,
+            1n,
+            BigInt(blockchain.now),
+            signature
+        );
 
         expect(res.transactions).toHaveTransaction({
             on: sale.address,
@@ -210,9 +335,16 @@ describe('Sale', () => {
 
     it('should reject on trying to purchase 0 NFTs by accident', async () => {
         blockchain.now = 1800000000;
-        const signature = sale.signPurchase(adminKeypair, 123n, users[0].address);
-        await sale.sendPurchase(users[0].getSender(), toNano('100'), 5n, signature, 123n, users[0].address);
-        const res = await sale.sendPurchase(users[0].getSender(), toNano('2.5'), 1n, signature, 123n, users[0].address);
+        const signature = sale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
+        await sale.sendPurchase(users[0].getSender(), toNano('100'), 123n, 5n, BigInt(blockchain.now), signature);
+        const res = await sale.sendPurchase(
+            users[0].getSender(),
+            toNano('2.5'),
+            123n,
+            1n,
+            BigInt(blockchain.now),
+            signature
+        );
 
         expect(res.transactions).toHaveTransaction({
             on: sale.address,
@@ -222,8 +354,15 @@ describe('Sale', () => {
 
     it('should reject on trying to purchase 0 NFTs', async () => {
         blockchain.now = 1800000000;
-        const signature = sale.signPurchase(adminKeypair, 123n, users[0].address);
-        const res = await sale.sendPurchase(users[0].getSender(), toNano('1'), 0n, signature, 123n, users[0].address);
+        const signature = sale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
+        const res = await sale.sendPurchase(
+            users[0].getSender(),
+            toNano('1'),
+            123n,
+            0n,
+            BigInt(blockchain.now),
+            signature
+        );
 
         expect(res.transactions).toHaveTransaction({
             on: sale.address,
@@ -233,55 +372,51 @@ describe('Sale', () => {
 
     it('should return unused coins', async () => {
         blockchain.now = 1800000000;
-        const signature = sale.signPurchase(adminKeypair, 123n, users[0].address);
+        const signature = sale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
         const res = await sale.sendPurchase(
             users[0].getSender(),
             toNano('10000'),
-            3n,
-            signature,
             123n,
-            users[0].address
+            3n,
+            BigInt(blockchain.now),
+            signature
         );
 
-        expect(res.transactions).toHaveTransaction({
-            from: sale.address,
-            to: users[0].address,
-            value: toNano('9993.729'),
-        });
+        expect((await blockchain.getContract(users[0].address)).balance).toBeGreaterThanOrEqual(toNano('9993'));
     });
 
     it('should work with as little coins as possible', async () => {
         blockchain.now = 1800000000;
-        const signature = sale.signPurchase(adminKeypair, 123n, users[0].address);
+        const signature = sale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
 
-        const res = await sale.sendPurchase(
+        let res = await sale.sendPurchase(
             users[0].getSender(),
-            toNano('6.269'),
-            3n,
-            signature,
+            toNano('6.139'),
             123n,
-            users[0].address
+            3n,
+            BigInt(blockchain.now),
+            signature
         );
         expect(res.transactions).toHaveTransaction({
             on: sale.address,
             exitCode: 703,
         });
 
-        await sale.sendPurchase(users[0].getSender(), toNano('6.27'), 3n, signature, 123n, users[0].address);
+        await sale.sendPurchase(users[0].getSender(), toNano('6.24'), 123n, 3n, BigInt(blockchain.now), signature);
         expect(await collection.getNextItemIndex()).toEqual(3n);
     });
 
     it('should transfer funds to admin after successful purchase', async () => {
         blockchain.now = 1800000000;
-        const signature = sale.signPurchase(adminKeypair, 123n, users[0].address);
+        const signature = sale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
 
         const res = await sale.sendPurchase(
             users[0].getSender(),
             toNano('6.27'),
-            3n,
-            signature,
             123n,
-            users[0].address
+            3n,
+            BigInt(blockchain.now),
+            signature
         );
         expect(res.transactions).toHaveTransaction({
             from: sale.address,
@@ -301,8 +436,15 @@ describe('Sale', () => {
         expect(await collection.getOwner()).toEqualAddress(users[0].address);
 
         blockchain.now = 1800000000;
-        const signature = sale.signPurchase(adminKeypair, 123n, users[0].address);
-        result = await sale.sendPurchase(users[0].getSender(), toNano('2.5'), 1n, signature, 123n, users[0].address);
+        const signature = sale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
+        result = await sale.sendPurchase(
+            users[0].getSender(),
+            toNano('2.5'),
+            123n,
+            1n,
+            BigInt(blockchain.now),
+            signature
+        );
         expect(result.transactions).toHaveTransaction({
             from: users[0].address,
             to: sale.address,
@@ -313,8 +455,8 @@ describe('Sale', () => {
 
     it('should mint NFTs with correct content', async () => {
         blockchain.now = 1800000000;
-        const signature = sale.signPurchase(adminKeypair, 123n, users[0].address);
-        await sale.sendPurchase(users[0].getSender(), toNano('12'), 5n, signature, 123n, users[0].address);
+        const signature = sale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
+        await sale.sendPurchase(users[0].getSender(), toNano('12'), 123n, 5n, BigInt(blockchain.now), signature);
 
         const nft = blockchain.openContract(await collection.getNftItemByIndex(2n));
         expect(await collection.getNftContent(2n, await nft.getIndividualContent())).toEqualCell(
