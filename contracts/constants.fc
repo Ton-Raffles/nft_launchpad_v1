@@ -4,7 +4,7 @@ const int op::purchase_check = 0x492ef905;
 const int op::purchase_confirm = 0xd51543b9;
 const int op::bounced = 0xffffffff;
 
-const int const::base_fees = 50000000;
+const int const::base_fees = 10000000;
 const int const::fees = 20000000;
 const int const::deploy_value = 10000000;
 

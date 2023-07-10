@@ -165,6 +165,49 @@ describe('Sale', () => {
         }
     });
 
+    it('should mint anywhere between 1 and 100 NFTs at once', async () => {
+        blockchain.now = 1800000000;
+
+        let newSale = blockchain.openContract(
+            Sale.createFromConfig(
+                {
+                    adminPubkey: adminKeypair.publicKey,
+                    available: 10000n,
+                    price: toNano('1'),
+                    lastIndex: 0n,
+                    collection: collection.address,
+                    buyerLimit: 10000n,
+                    startTime: 1800000000n,
+                    endTime: 1900000000n,
+                    adminAddress: admin.address,
+                    helperCode,
+                },
+                code
+            )
+        );
+
+        await newSale.sendDeploy(admin.getSender(), toNano('0.05'));
+        await sale.sendChangeCollectionOwner(admin.getSender(), toNano('0.05'), newSale.address);
+
+        const signature = newSale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
+
+        for (let i = 1; i <= 100; i++) {
+            let before = (await blockchain.getContract(newSale.address)).balance;
+            await newSale.sendPurchase(
+                users[0].getSender(),
+                toNano('1000'),
+                123n,
+                BigInt(i),
+                BigInt(blockchain.now),
+                signature
+            );
+            let after = (await blockchain.getContract(newSale.address)).balance;
+            expect(after).toBeGreaterThanOrEqual(before);
+        }
+
+        expect(await collection.getNextItemIndex()).toEqual(5050n);
+    });
+
     it('should not mint 101 NFTs at once', async () => {
         blockchain.now = 1800000000;
 
