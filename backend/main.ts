@@ -27,6 +27,9 @@ const jwtSecretKey = process.env.JWT_ADMIN!;
 const saleCode = Cell.fromBoc(
     Buffer.from(JSON.parse(fs.readFileSync('./build/Sale.compiled.json').toString('utf-8')).hex, 'hex')
 )[0];
+const helperCode = Cell.fromBoc(
+    Buffer.from(JSON.parse(fs.readFileSync('./build/Helper.compiled.json').toString('utf-8')).hex, 'hex')
+)[0];
 const adminWallet = WalletContractV3R2.create({ workchain: 0, publicKey: keyPair.publicKey });
 const adminSender = client.open(adminWallet).sender(keyPair.secretKey);
 const adminAddress = adminWallet.address;
@@ -135,6 +138,7 @@ app.post('/createSale', authorizeAdmin, async (req, res) => {
             startTime: BigInt(startTime),
             endTime: BigInt(endTime),
             adminAddress,
+            helperCode,
         };
 
         const contract = client.open(Sale.createFromConfig(config, saleCode));
