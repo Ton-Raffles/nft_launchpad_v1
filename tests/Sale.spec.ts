@@ -61,6 +61,7 @@ describe('Sale', () => {
                     endTime: 1900000000n,
                     adminAddress: admin.address,
                     helperCode,
+                    affilatePercentage: 500n,
                 },
                 code
             )
@@ -104,6 +105,29 @@ describe('Sale', () => {
         expect(await collection.getNextItemIndex()).toEqual(1n);
         const nft = blockchain.openContract(await collection.getNftItemByIndex(0n));
         expect(await nft.getOwner()).toEqualAddress(users[0].address);
+    });
+
+    it('should mint one NFT with referrer', async () => {
+        blockchain.now = 1800000000;
+        const signature = sale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
+        const res = await sale.sendPurchase(
+            users[0].getSender(),
+            toNano('2.5'),
+            123n,
+            1n,
+            BigInt(blockchain.now),
+            signature,
+            users[1].address
+        );
+
+        expect(await collection.getNextItemIndex()).toEqual(1n);
+        const nft = blockchain.openContract(await collection.getNftItemByIndex(0n));
+        expect(await nft.getOwner()).toEqualAddress(users[0].address);
+        expect(res.transactions).toHaveTransaction({
+            from: sale.address,
+            to: users[1].address,
+            value: toNano('0.1'),
+        });
     });
 
     it('should mint several NFTs at once', async () => {
@@ -206,6 +230,56 @@ describe('Sale', () => {
         }
 
         expect(await collection.getNextItemIndex()).toEqual(5050n);
+    });
+
+    it('should mint anywhere between 1 and 20 NFTs at once with referrer', async () => {
+        blockchain.now = 1800000000;
+
+        let newSale = blockchain.openContract(
+            Sale.createFromConfig(
+                {
+                    adminPubkey: adminKeypair.publicKey,
+                    available: 10000n,
+                    price: toNano('1'),
+                    lastIndex: 0n,
+                    collection: collection.address,
+                    buyerLimit: 10000n,
+                    startTime: 1800000000n,
+                    endTime: 1900000000n,
+                    adminAddress: admin.address,
+                    helperCode,
+                    affilatePercentage: 500n,
+                },
+                code
+            )
+        );
+
+        await newSale.sendDeploy(admin.getSender(), toNano('0.05'));
+        await sale.sendChangeCollectionOwner(admin.getSender(), toNano('0.05'), newSale.address);
+
+        const signature = newSale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
+
+        for (let i = 1; i <= 20; i++) {
+            let before = (await blockchain.getContract(newSale.address)).balance;
+            const result = await newSale.sendPurchase(
+                users[0].getSender(),
+                toNano('1000'),
+                123n,
+                BigInt(i),
+                BigInt(blockchain.now),
+                signature,
+                users[1].address
+            );
+            let after = (await blockchain.getContract(newSale.address)).balance;
+            expect(after).toBeGreaterThanOrEqual(before);
+            expect(result.transactions).toHaveTransaction({
+                from: newSale.address,
+                to: users[1].address,
+                value: (BigInt(i) * toNano('1')) / 20n,
+            });
+        }
+
+        expect(await collection.getNextItemIndex()).toEqual(210n);
     });
 
     it('should not mint 101 NFTs at once', async () => {
@@ -486,6 +560,41 @@ describe('Sale', () => {
 
         await sale.sendPurchase(users[0].getSender(), toNano('6.24'), 123n, 3n, BigInt(blockchain.now), signature);
         expect(await collection.getNextItemIndex()).toEqual(3n);
+    });
+
+    it('should work with as little coins as possible with referrer', async () => {
+        blockchain.now = 1800000000;
+        const signature = sale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
+
+        let res = await sale.sendPurchase(
+            users[0].getSender(),
+            toNano('6.139'),
+            123n,
+            3n,
+            BigInt(blockchain.now),
+            signature,
+            users[1].address
+        );
+        expect(res.transactions).toHaveTransaction({
+            on: sale.address,
+            exitCode: 703,
+        });
+
+        res = await sale.sendPurchase(
+            users[0].getSender(),
+            toNano('6.24'),
+            123n,
+            3n,
+            BigInt(blockchain.now),
+            signature,
+            users[1].address
+        );
+        expect(await collection.getNextItemIndex()).toEqual(3n);
+        expect(res.transactions).toHaveTransaction({
+            from: sale.address,
+            to: users[1].address,
+            value: toNano('0.3'),
+        });
     });
 
     it('should transfer funds to admin after successful purchase', async () => {

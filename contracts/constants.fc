@@ -1,7 +1,8 @@
-const int op::purchase = 0x26c6f3d0;
+const int op::purchase = 0x503a1f4;
 const int op::change_collection_owner = 0x49a4bbf6;
-const int op::purchase_check = 0x492ef905;
-const int op::purchase_confirm = 0xd51543b9;
+const int op::purchase_check = 0x26ae3cf9;
+const int op::purchase_confirm = 0xdde87fe4;
+const int op::credit_affilate = 0x27e28b63;
 const int op::bounced = 0xffffffff;
 
 const int const::base_fees = 10000000;

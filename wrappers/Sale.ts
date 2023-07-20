@@ -12,6 +12,7 @@ export type SaleConfig = {
     endTime: bigint;
     adminAddress: Address;
     helperCode: Cell;
+    affilatePercentage?: bigint;
 };
 
 export function saleConfigToCell(config: SaleConfig): Cell {
@@ -27,6 +28,8 @@ export function saleConfigToCell(config: SaleConfig): Cell {
         .storeAddress(config.adminAddress)
         .storeUint(1, 1)
         .storeRef(config.helperCode)
+        .storeCoins(0)
+        .storeUint(config.affilatePercentage || 0, 16)
         .storeUint(Math.floor(Math.random() * 10000), 16)
         .endCell();
 }
@@ -64,17 +67,20 @@ export class Sale implements Contract {
         queryId: bigint,
         quantity: bigint,
         time: bigint,
-        signature: Buffer
+        signature: Buffer,
+        referrer?: Address
     ) {
+        const maybeReferrer = referrer ? beginCell().storeAddress(referrer).endCell().beginParse() : undefined;
         await provider.internal(via, {
             value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
             body: beginCell()
-                .storeUint(0x26c6f3d0, 32)
+                .storeUint(0x0503a1f4, 32)
                 .storeUint(queryId, 64)
                 .storeUint(quantity, 16)
                 .storeUint(time, 64)
                 .storeBuffer(signature, 64)
+                .storeMaybeSlice(maybeReferrer)
                 .endCell(),
         });
     }

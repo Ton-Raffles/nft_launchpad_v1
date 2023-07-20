@@ -12,6 +12,8 @@ global int data::end_time;
 global slice data::admin_address;
 global int data::active;
 global cell data::helper_code;
+global int data::total_affilate;
+global int data::affilate_percentage;
 
 global int query_id;
 global slice sender;
@@ -29,6 +31,8 @@ global slice sender;
     data::admin_address = ds~load_msg_addr();
     data::active = ds~load_int(1);
     data::helper_code = ds~load_ref();
+    data::total_affilate = ds~load_coins();
+    data::affilate_percentage = ds~load_uint(16);
 }
 
 () save_data() impure {
@@ -44,6 +48,8 @@ global slice sender;
         .store_slice(data::admin_address)
         .store_int(data::active, 1)
         .store_ref(data::helper_code)
+        .store_coins(data::total_affilate)
+        .store_uint(data::affilate_percentage, 16)
     .end_cell());
 }
 
@@ -70,6 +76,7 @@ global slice sender;
             .store_slice(my_address())
             .store_slice(user)
             .store_uint(data::buyer_limit, 32)
+            .store_coins(0)
         .end_cell())
         .store_uint(0, 1)
     .end_cell();
@@ -110,7 +117,7 @@ global slice sender;
     .end_cell(), 1);
 }
 
-() check(slice user, int quantity) impure {
+() check(slice user, int quantity, slice maybe_referrer) impure {
     cell helper_stateinit = calculate_helper_stateinit(user);
     send_raw_message(begin_cell()
         .store_uint(0x18, 6)
@@ -121,6 +128,7 @@ global slice sender;
         .store_uint(op::purchase_check, 32)
         .store_uint(query_id, 64)
         .store_uint(quantity, 16)
+        .store_slice(maybe_referrer)
     .end_cell(), 64);
 }
 
@@ -159,13 +167,16 @@ global slice sender;
         (int workchain, int account_id) = parse_std_addr(sender);
         throw_unless(error::wrong_workchain, workchain == 0);
 
-        check(sender, quantity);
+        slice maybe_referrer = in_msg_body;
+
+        check(sender, quantity, maybe_referrer);
     }
 
     elseif (op == op::purchase_confirm) {
         query_id = in_msg_body~load_uint(64);
         int quantity = in_msg_body~load_uint(16);
         slice user = in_msg_body~load_msg_addr();
+        slice maybe_referrer = in_msg_body;
 
         throw_unless(error::wrong_sender, equal_slices(sender, calculate_helper_address(calculate_helper_stateinit(user))));
 
@@ -192,10 +203,25 @@ global slice sender;
         }
 
         if (data::price > 0) {
+            int total = quantity * data::price;
+
+            if (maybe_referrer~load_int(1)) {
+                int referral_part = total * data::affilate_percentage / 10000;
+                if (referral_part > 0) {
+                    total -= referral_part;
+                    send_raw_message(begin_cell()
+                        .store_uint(0x10, 6)
+                        .store_slice(maybe_referrer)
+                        .store_coins(referral_part)
+                        .store_uint(0, 107)
+                    .end_cell(), 1);
+                }
+            }
+            
             send_raw_message(begin_cell()
                 .store_uint(0x10, 6)
                 .store_slice(data::admin_address)
-                .store_coins(quantity * data::price)
+                .store_coins(total)
                 .store_uint(0, 107)
             .end_cell(), 1);
         }

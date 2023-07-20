@@ -126,6 +126,7 @@ app.post('/createSale', authorizeAdmin, async (req, res) => {
         buyerLimit,
         lastIndex,
         launch_id,
+        affilatePercentage,
     } = req.body;
     try {
         const config: SaleConfig = {
@@ -139,6 +140,7 @@ app.post('/createSale', authorizeAdmin, async (req, res) => {
             endTime: BigInt(endTime),
             adminAddress,
             helperCode,
+            affilatePercentage,
         };
 
         const contract = client.open(Sale.createFromConfig(config, saleCode));
