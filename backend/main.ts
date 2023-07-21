@@ -6,6 +6,7 @@ import { config } from 'dotenv';
 import { keyPairFromSecretKey, sign } from 'ton-crypto';
 import { Address, Cell, SendMode, WalletContractV3R2, beginCell, internal, toNano, TonClient } from 'ton';
 import { Sale, SaleConfig, saleConfigToCell } from '../wrappers/Sale';
+import { NFTCollection } from '../wrappers/NFTCollection';
 import * as fs from 'fs';
 import cors from 'cors';
 
@@ -29,6 +30,12 @@ const saleCode = Cell.fromBoc(
 )[0];
 const helperCode = Cell.fromBoc(
     Buffer.from(JSON.parse(fs.readFileSync('./build/Helper.compiled.json').toString('utf-8')).hex, 'hex')
+)[0];
+const NFTItemCode = Cell.fromBoc(
+    Buffer.from(JSON.parse(fs.readFileSync('./build/NFTItem.compiled.json').toString('utf-8')).hex, 'hex')
+)[0];
+const NFTCollectionCode = Cell.fromBoc(
+    Buffer.from(JSON.parse(fs.readFileSync('./build/NFTCollection.compiled.json').toString('utf-8')).hex, 'hex')
 )[0];
 const adminWallet = WalletContractV3R2.create({ workchain: 0, publicKey: keyPair.publicKey });
 const adminSender = client.open(adminWallet).sender(keyPair.secretKey);
@@ -305,6 +312,32 @@ app.get('/sales/launch/:id', async (req, res) => {
         const sales = result.rows;
         res.json(sales);
     } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/createCollection', authorizeAdmin, async (req, res) => {
+    const { ownerAddress, collectionContentUrl, collectionCommonContentUrl, royaltyBase, royaltyFactor } = req.body;
+
+    try {
+        const collection = client.open(
+            NFTCollection.createFromConfig(
+                {
+                    owner: ownerAddress,
+                    collectionContent: beginCell().storeUint(1, 8).storeStringTail(collectionContentUrl).endCell(),
+                    commonContent: beginCell().storeStringTail(collectionCommonContentUrl).endCell(),
+                    itemCode: NFTItemCode,
+                    royaltyFactor,
+                    royaltyBase,
+                },
+                NFTCollectionCode
+            )
+        );
+        await collection.sendDeploy(adminSender, toNano('0.10'));
+
+        res.json({ message: 'Collection created successfully' });
+    } catch (err: any) {
+        console.log(err);
         res.status(500).json({ error: err.message });
     }
 });
