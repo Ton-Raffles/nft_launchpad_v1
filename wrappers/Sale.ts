@@ -92,4 +92,53 @@ export class Sale implements Contract {
             body: beginCell().storeUint(0x49a4bbf6, 32).storeAddress(newOwner).endCell(),
         });
     }
+
+    async getAvailable(provider: ContractProvider): Promise<bigint> {
+        const result = (await provider.get('get_contract_data', [])).stack;
+        result.skip(1);
+        return result.readBigNumber();
+    }
+
+    async getPrice(provider: ContractProvider): Promise<bigint> {
+        const result = (await provider.get('get_contract_data', [])).stack;
+        result.skip(2);
+        return result.readBigNumber();
+    }
+
+    async getLastIndex(provider: ContractProvider): Promise<bigint> {
+        const result = (await provider.get('get_contract_data', [])).stack;
+        result.skip(3);
+        return result.readBigNumber();
+    }
+
+    async getBuyerLimit(provider: ContractProvider): Promise<bigint> {
+        const result = (await provider.get('get_contract_data', [])).stack;
+        result.skip(5);
+        return result.readBigNumber();
+    }
+
+    async getStartEndTime(provider: ContractProvider): Promise<[number, number]> {
+        const result = (await provider.get('get_contract_data', [])).stack;
+        result.skip(6);
+        return [result.readNumber(), result.readNumber()];
+    }
+
+    async getActive(provider: ContractProvider): Promise<boolean> {
+        const result = (await provider.get('get_contract_data', [])).stack;
+        console.log(result);
+        result.skip(9);
+        return result.readBoolean();
+    }
+
+    async getAffilateTotal(provider: ContractProvider): Promise<bigint> {
+        const result = (await provider.get('get_contract_data', [])).stack;
+        result.skip(11);
+        return result.readBigNumber();
+    }
+
+    async getAffilatePercentage(provider: ContractProvider): Promise<bigint> {
+        const result = (await provider.get('get_contract_data', [])).stack;
+        result.skip(12);
+        return result.readBigNumber();
+    }
 }

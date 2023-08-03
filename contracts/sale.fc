@@ -244,3 +244,8 @@ global slice sender;
 
     save_data();
 }
+
+(int, int, int, int, slice, int, int, int, slice, int, cell, int, int) get_contract_data() method_id {
+    load_data();
+    return (data::admin_pubkey, data::available, data::price, data::last_index, data::collection, data::buyer_limit, data::start_time, data::end_time, data::admin_address, data::active, data::helper_code, data::total_affilate, data::affilate_percentage);
+}

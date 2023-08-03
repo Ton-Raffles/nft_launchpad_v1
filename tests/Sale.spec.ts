@@ -658,4 +658,19 @@ describe('Sale', () => {
                 .endCell()
         );
     });
+
+    it('should return correct data from get-methods', async () => {
+        blockchain.now = 1800000000;
+        const signature = sale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
+        await sale.sendPurchase(users[0].getSender(), toNano('12'), 123n, 5n, BigInt(blockchain.now), signature);
+
+        expect(await sale.getActive()).toBeTruthy();
+        expect(await sale.getAffilatePercentage()).toEqual(500n);
+        expect(await sale.getAffilateTotal()).toEqual(0n);
+        expect(await sale.getAvailable()).toEqual(15n);
+        expect(await sale.getBuyerLimit()).toEqual(5n);
+        expect(await sale.getLastIndex()).toEqual(5n);
+        expect(await sale.getPrice()).toEqual(toNano('2'));
+        expect(await sale.getStartEndTime()).toEqual([1800000000, 1900000000]);
+    });
 });

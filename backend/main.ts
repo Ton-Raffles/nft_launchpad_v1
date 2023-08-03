@@ -229,7 +229,9 @@ app.get('/checkUser/:saleId', async (req, res) => {
         const userAddress = Address.parse(address as string);
         const queryId = BigInt(query_id as string);
 
-        const bodyCell = beginCell().storeUint(queryId, 64).storeAddress(userAddress).endCell();
+        const currentTime = Date.now();
+
+        const bodyCell = beginCell().storeAddress(userAddress).storeUint(currentTime, 64).endCell();
         const signature = sign(bodyCell.hash(), keyPair.secretKey);
 
         // Check if user is whitelisted
@@ -255,7 +257,7 @@ app.get('/checkUser/:saleId', async (req, res) => {
             }
         }
 
-        return res.json({ access: true, signature: signature.toString('hex') });
+        return res.json({ access: true, signature: signature.toString('hex'), time: currentTime });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
