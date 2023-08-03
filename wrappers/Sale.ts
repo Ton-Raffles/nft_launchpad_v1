@@ -125,7 +125,6 @@ export class Sale implements Contract {
 
     async getActive(provider: ContractProvider): Promise<boolean> {
         const result = (await provider.get('get_contract_data', [])).stack;
-        console.log(result);
         result.skip(9);
         return result.readBoolean();
     }
