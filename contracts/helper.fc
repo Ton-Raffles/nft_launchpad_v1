@@ -85,3 +85,8 @@ global int data::total_affilate;
         save_data();
     }
 }
+
+(slice, slice, int, int) get_contract_data() method_id {
+    load_data();
+    return (data::sale, data::user, data::available, data::total_affilate);
+}
