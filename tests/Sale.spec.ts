@@ -645,6 +645,23 @@ describe('Sale', () => {
         });
     });
 
+    it('should change the last index value by admin', async () => {
+        let result = await sale.sendChangeLastIndex(users[0].getSender(), toNano('0.05'), 12345n);
+        expect(result.transactions).toHaveTransaction({
+            from: users[0].address,
+            to: sale.address,
+            exitCode: 702,
+        });
+
+        result = await sale.sendChangeLastIndex(admin.getSender(), toNano('0.05'), 12345n);
+        expect(result.transactions).toHaveTransaction({
+            from: admin.address,
+            to: sale.address,
+            success: true,
+        });
+        expect(await sale.getLastIndex()).toEqual(12345n);
+    });
+
     it('should mint NFTs with correct content', async () => {
         blockchain.now = 1800000000;
         const signature = sale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));

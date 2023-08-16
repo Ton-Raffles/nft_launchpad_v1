@@ -93,6 +93,14 @@ export class Sale implements Contract {
         });
     }
 
+    async sendChangeLastIndex(provider: ContractProvider, via: Sender, value: bigint, newLastIndex: bigint) {
+        await provider.internal(via, {
+            value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell().storeUint(0x38a7a824, 32).storeUint(newLastIndex, 32).endCell(),
+        });
+    }
+
     async getAvailable(provider: ContractProvider): Promise<bigint> {
         const result = (await provider.get('get_contract_data', [])).stack;
         result.skip(1);
