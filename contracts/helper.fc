@@ -35,7 +35,7 @@ global int data::total_affilate;
     throw_unless(error::wrong_sender, equal_slices(sender, data::sale));
 
     int op = in_msg_body~load_uint(32);
-
+    
     if (op == op::purchase_check) {
         int query_id = in_msg_body~load_uint(64);
         int quantity = in_msg_body~load_uint(16);
@@ -60,10 +60,9 @@ global int data::total_affilate;
         .end_cell(), 64);
 
         data::available -= quantity;
-        save_data();
     }
 
-    elseif (op = op::bounced) {
+    elseif (op == op::bounced) {
         in_msg_body~skip_bits(32);
 
         send_raw_message(begin_cell()
@@ -75,15 +74,15 @@ global int data::total_affilate;
         .end_cell(), 64);
 
         data::available += in_msg_body~load_uint(16);
-        save_data();
     }
 
     elseif (op == op::credit_affilate) {
         int query_id = in_msg_body~load_uint(64);
         int amount = in_msg_body~load_coins();
         data::total_affilate += amount;
-        save_data();
     }
+
+    save_data();
 }
 
 (slice, slice, int, int) get_contract_data() method_id {

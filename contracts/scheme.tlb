@@ -1,6 +1,6 @@
 _ admin_pubkey:uint256 available:uint32 price:Coins last_index:uint32 collection:MsgAddressInt
   buyer_limit:uint32 start_time:uint32 end_time:uint32 admin_address:MsgAddressInt
-  active:Bool helper_code:^Cell total_affilate:Coins affilate_percentage:uint16 extra:uint16 = SaleStorage;
+  active:Bool helper_code:^Cell ^[total_affilate:Coins affilate_percentage:uint16 extra:uint16] = SaleStorage;
 
 _ sale:MsgAddressInt user:MsgAddressInt available:uint32 total_affilate:Coins = HelperStorage;
 

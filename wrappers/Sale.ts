@@ -28,9 +28,13 @@ export function saleConfigToCell(config: SaleConfig): Cell {
         .storeAddress(config.adminAddress)
         .storeUint(1, 1)
         .storeRef(config.helperCode)
-        .storeCoins(0)
-        .storeUint(config.affilatePercentage || 0, 16)
-        .storeUint(Math.floor(Math.random() * 10000), 16)
+        .storeRef(
+            beginCell()
+                .storeCoins(0)
+                .storeUint(config.affilatePercentage || 0, 16)
+                .storeUint(Math.floor(Math.random() * 10000), 16)
+                .endCell()
+        )
         .endCell();
 }
 

@@ -31,8 +31,9 @@ global slice sender;
     data::admin_address = ds~load_msg_addr();
     data::active = ds~load_int(1);
     data::helper_code = ds~load_ref();
-    data::total_affilate = ds~load_coins();
-    data::affilate_percentage = ds~load_uint(16);
+    slice next = ds~load_ref().begin_parse();
+    data::total_affilate = next~load_coins();
+    data::affilate_percentage = next~load_uint(16);
 }
 
 () save_data() impure {
@@ -48,8 +49,10 @@ global slice sender;
         .store_slice(data::admin_address)
         .store_int(data::active, 1)
         .store_ref(data::helper_code)
-        .store_coins(data::total_affilate)
-        .store_uint(data::affilate_percentage, 16)
+        .store_ref(begin_cell()
+            .store_coins(data::total_affilate)
+            .store_uint(data::affilate_percentage, 16)
+        .end_cell())
     .end_cell());
 }
 
@@ -206,15 +209,30 @@ global slice sender;
             int total = quantity * data::price;
 
             if (maybe_referrer~load_int(1)) {
+                slice referrer = maybe_referrer;
                 int referral_part = total * data::affilate_percentage / 10000;
-                if (referral_part > 0) {
+                if (referral_part > const::fees) {
                     total -= referral_part;
                     send_raw_message(begin_cell()
                         .store_uint(0x10, 6)
-                        .store_slice(maybe_referrer)
-                        .store_coins(referral_part)
+                        .store_slice(referrer)
+                        .store_coins(referral_part - const::fees)
                         .store_uint(0, 107)
-                    .end_cell(), 1);
+                    .end_cell(), 0);
+
+                    data::total_affilate += referral_part;
+                    cell referrer_helper_stateinit = calculate_helper_stateinit(referrer);
+                    slice referrer_helper_address = calculate_helper_address(referrer_helper_stateinit);
+                    send_raw_message(begin_cell()
+                        .store_uint(0x18, 6)
+                        .store_slice(referrer_helper_address)
+                        .store_coins(const::fees)
+                        .store_uint(6, 108)
+                        .store_ref(referrer_helper_stateinit)
+                        .store_uint(op::credit_affilate, 32)
+                        .store_uint(query_id, 64)
+                        .store_coins(referral_part)
+                    .end_cell(), 0);
                 }
             }
             

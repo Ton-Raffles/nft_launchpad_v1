@@ -127,8 +127,20 @@ describe('Sale', () => {
         expect(res.transactions).toHaveTransaction({
             from: sale.address,
             to: users[1].address,
-            value: toNano('0.1'),
+            value: toNano('0.079'),
         });
+        expect(await sale.getAffilateTotal()).toEqual(toNano('0.1'));
+        const referrerHelper = blockchain.openContract(
+            Helper.createFromConfig(
+                {
+                    sale: sale.address,
+                    user: users[1].address,
+                    available: 5n,
+                },
+                helperCode
+            )
+        );
+        expect(await referrerHelper.getTotalAffilate()).toEqual(toNano('0.1'));
     });
 
     it('should mint several NFTs at once', async () => {
@@ -276,11 +288,24 @@ describe('Sale', () => {
             expect(result.transactions).toHaveTransaction({
                 from: newSale.address,
                 to: users[1].address,
-                value: (BigInt(i) * toNano('1')) / 20n,
+                value: (x: bigint | undefined) => (x ? x >= (BigInt(i) * toNano('1')) / 20n - toNano('0.03') : false),
             });
         }
 
         expect(await collection.getNextItemIndex()).toEqual(210n);
+        expect(await newSale.getAffilateTotal()).toEqual(toNano('10.5'));
+
+        const referrerHelper = blockchain.openContract(
+            Helper.createFromConfig(
+                {
+                    sale: newSale.address,
+                    user: users[1].address,
+                    available: 10000n,
+                },
+                helperCode
+            )
+        );
+        expect(await referrerHelper.getTotalAffilate()).toEqual(toNano('10.5'));
     });
 
     it('should not mint 101 NFTs at once', async () => {
@@ -594,7 +619,7 @@ describe('Sale', () => {
         expect(res.transactions).toHaveTransaction({
             from: sale.address,
             to: users[1].address,
-            value: toNano('0.3'),
+            value: toNano('0.279'),
         });
     });
 
@@ -703,5 +728,33 @@ describe('Sale', () => {
         );
         expect(await helper.getAvailable()).toEqual(1n);
         expect(await helper.getTotalAffilate()).toEqual(0n);
+    });
+
+    it('should process affilates correctly', async () => {
+        blockchain.now = 1800000000;
+        const signature = sale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
+        await sale.sendPurchase(
+            users[0].getSender(),
+            toNano('12'),
+            123n,
+            4n,
+            BigInt(blockchain.now),
+            signature,
+            users[1].address
+        );
+
+        expect(await sale.getAffilateTotal()).toEqual(toNano('0.4'));
+
+        const helper = blockchain.openContract(
+            Helper.createFromConfig(
+                {
+                    sale: sale.address,
+                    user: users[1].address,
+                    available: 5n,
+                },
+                helperCode
+            )
+        );
+        expect(await helper.getTotalAffilate()).toEqual(toNano('0.4'));
     });
 });
