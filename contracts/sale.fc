@@ -156,7 +156,7 @@ global slice sender;
 
         throw_unless(error::too_many_items, quantity <= 100);
 
-        int value = quantity * (data::price + const::deploy_value + const::fees * 2) + const::base_fees;
+        int value = quantity * (data::price + const::deploy_value + const::fees * 2) + const::base_fees * 2;
         throw_unless(error::not_enough_value, msg_value >= value);
 
         int time = in_msg_body~load_uint(64);

@@ -6,7 +6,7 @@ const int op::credit_affilate = 0x27e28b63;
 const int op::change_last_index = 0x38a7a824;
 const int op::bounced = 0xffffffff;
 
-const int const::base_fees = 10000000;
+const int const::base_fees = 25000000;
 const int const::fees = 20000000;
 const int const::deploy_value = 10000000;
 

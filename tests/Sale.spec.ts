@@ -573,7 +573,7 @@ describe('Sale', () => {
 
         let res = await sale.sendPurchase(
             users[0].getSender(),
-            toNano('6.139'),
+            toNano('6.199'),
             123n,
             3n,
             BigInt(blockchain.now),
@@ -584,7 +584,7 @@ describe('Sale', () => {
             exitCode: 703,
         });
 
-        await sale.sendPurchase(users[0].getSender(), toNano('6.24'), 123n, 3n, BigInt(blockchain.now), signature);
+        await sale.sendPurchase(users[0].getSender(), toNano('6.2'), 123n, 3n, BigInt(blockchain.now), signature);
         expect(await collection.getNextItemIndex()).toEqual(3n);
     });
 
@@ -594,7 +594,7 @@ describe('Sale', () => {
 
         let res = await sale.sendPurchase(
             users[0].getSender(),
-            toNano('6.139'),
+            toNano('6.199'),
             123n,
             3n,
             BigInt(blockchain.now),
@@ -608,19 +608,19 @@ describe('Sale', () => {
 
         res = await sale.sendPurchase(
             users[0].getSender(),
-            toNano('6.24'),
+            toNano('6.2'),
             123n,
             3n,
             BigInt(blockchain.now),
             signature,
             users[1].address
         );
-        expect(await collection.getNextItemIndex()).toEqual(3n);
         expect(res.transactions).toHaveTransaction({
             from: sale.address,
             to: users[1].address,
             value: toNano('0.279'),
         });
+        expect(await collection.getNextItemIndex()).toEqual(3n);
     });
 
     it('should transfer funds to admin after successful purchase', async () => {
