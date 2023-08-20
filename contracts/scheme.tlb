@@ -9,4 +9,4 @@ change_collection_owner#49a4bbf6 new_owner:MsgAddressInt = InternalMsgBody;
 purchase_check#26ae3cf9 query_id:uint64 quantity:uint16 referrer:(Maybe MsgAddressInt) = InternalMsgBody;
 purchase_confirm#dde87fe4 query_id:uint64 quantity:uint16 user:MsgAddressInt referrer:(Maybe MsgAddressInt) = InternalMsgBody;
 credit_affilate#27e28b63 query_id:uint64 amount:Coins = InternalMsgBody;
-change_last_index#38a7a824 query_id:uint64 new:uint32 = InternalMsgBody;
+change_last_index#27eb8974 new:uint32 = InternalMsgBody;

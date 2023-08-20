@@ -101,7 +101,7 @@ export class Sale implements Contract {
         await provider.internal(via, {
             value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
-            body: beginCell().storeUint(0x38a7a824, 32).storeUint(newLastIndex, 32).endCell(),
+            body: beginCell().storeUint(0x27eb8974, 32).storeUint(newLastIndex, 32).endCell(),
         });
     }
 
