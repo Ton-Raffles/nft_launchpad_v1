@@ -156,7 +156,7 @@ global slice sender;
 
         throw_unless(error::too_many_items, quantity <= 100);
 
-        int value = quantity * (data::price + const::deploy_value + const::fees * 2) + const::base_fees * 2;
+        int value = quantity * (data::price + const::deploy_value + const::fees * 2) + const::base_fees * 2 + const::fees;
         throw_unless(error::not_enough_value, msg_value >= value);
 
         int time = in_msg_body~load_uint(64);
@@ -189,20 +189,20 @@ global slice sender;
 
         throw_unless(error::zero_purchase, quantity > 0);
 
-        int value = quantity * (data::price + const::deploy_value + const::fees * 2) + const::base_fees;
+        int value = quantity * (data::price + const::deploy_value + const::fees * 2) + const::base_fees + const::fees;
 
         throw_unless(error::not_enough_value, msg_value >= value);
         data::available -= quantity;
 
         mint(user, quantity);
 
-        if (msg_value - value > const::fees) {
+        if (msg_value > value) {
             send_raw_message(begin_cell()
                 .store_uint(0x10, 6)
                 .store_slice(user)
                 .store_coins(msg_value - value)
                 .store_uint(0, 107)
-            .end_cell(), 0);
+            .end_cell(), 2);
         }
 
         if (data::price > 0) {
@@ -211,14 +211,14 @@ global slice sender;
             if (maybe_referrer~load_int(1)) {
                 slice referrer = maybe_referrer;
                 int referral_part = total * data::affilate_percentage / 10000;
-                if (referral_part > const::fees) {
-                    total -= referral_part;
+                if (referral_part > 0) {
+                    total -= referral_part - const::fees;
                     send_raw_message(begin_cell()
                         .store_uint(0x10, 6)
                         .store_slice(referrer)
-                        .store_coins(referral_part - const::fees)
+                        .store_coins(referral_part)
                         .store_uint(0, 107)
-                    .end_cell(), 0);
+                    .end_cell(), 1);
 
                     data::total_affilate += referral_part;
                     cell referrer_helper_stateinit = calculate_helper_stateinit(referrer);
@@ -232,16 +232,18 @@ global slice sender;
                         .store_uint(op::credit_affilate, 32)
                         .store_uint(query_id, 64)
                         .store_coins(referral_part)
-                    .end_cell(), 0);
+                    .end_cell(), 1);
                 }
             }
             
-            send_raw_message(begin_cell()
-                .store_uint(0x10, 6)
-                .store_slice(data::admin_address)
-                .store_coins(total)
-                .store_uint(0, 107)
-            .end_cell(), 1);
+            if (total > 0) {
+                send_raw_message(begin_cell()
+                    .store_uint(0x10, 6)
+                    .store_slice(data::admin_address)
+                    .store_coins(total)
+                    .store_uint(0, 107)
+                .end_cell(), 1);
+            }
         }
     }
 

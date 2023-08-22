@@ -1,5 +1,5 @@
-import { Address, beginCell, Cell, Contract, contractAddress, ContractProvider, Sender, SendMode } from 'ton-core';
-import { KeyPair, sign } from 'ton-crypto';
+import { Address, beginCell, Cell, Contract, contractAddress, ContractProvider, Sender, SendMode } from '@ton/core';
+import { KeyPair, sign } from '@ton/crypto';
 
 export type SaleConfig = {
     adminPubkey: Buffer;

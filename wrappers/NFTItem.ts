@@ -1,4 +1,4 @@
-import { Address, beginCell, Cell, Contract, ContractProvider, Sender, SendMode, toNano } from 'ton-core';
+import { Address, beginCell, Cell, Contract, ContractProvider, Sender, SendMode, toNano } from '@ton/core';
 
 export class NFTItem implements Contract {
     constructor(readonly address: Address, readonly init?: { code: Cell; data: Cell }) {}

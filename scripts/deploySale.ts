@@ -1,6 +1,6 @@
-import { toNano } from 'ton-core';
+import { toNano } from '@ton/ton';
 import { Sale } from '../wrappers/Sale';
-import { compile, NetworkProvider } from '@ton-community/blueprint';
+import { compile, NetworkProvider } from '@ton/blueprint';
 
 export async function run(provider: NetworkProvider) {
     // const sale = provider.open(Sale.createFromConfig({}, await compile('Sale')));

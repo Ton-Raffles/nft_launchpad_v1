@@ -1,10 +1,10 @@
-import { Blockchain, SandboxContract, Treasury, TreasuryContract } from '@ton-community/sandbox';
-import { Cell, beginCell, toNano } from 'ton-core';
+import { Blockchain, SandboxContract, Treasury, TreasuryContract, printTransactionFees } from '@ton/sandbox';
+import { Cell, beginCell, toNano } from '@ton/core';
 import { Sale } from '../wrappers/Sale';
 import { NFTCollection } from '../wrappers/NFTCollection';
-import '@ton-community/test-utils';
-import { compile } from '@ton-community/blueprint';
-import { KeyPair, getSecureRandomBytes, keyPairFromSeed } from 'ton-crypto';
+import '@ton/test-utils';
+import { compile } from '@ton/blueprint';
+import { KeyPair, getSecureRandomBytes, keyPairFromSeed } from '@ton/crypto';
 import { Helper } from '../wrappers/Helper';
 
 describe('Sale', () => {
@@ -120,14 +120,13 @@ describe('Sale', () => {
             signature,
             users[1].address
         );
-
         expect(await collection.getNextItemIndex()).toEqual(1n);
         const nft = blockchain.openContract(await collection.getNftItemByIndex(0n));
         expect(await nft.getOwner()).toEqualAddress(users[0].address);
         expect(res.transactions).toHaveTransaction({
             from: sale.address,
             to: users[1].address,
-            value: toNano('0.079'),
+            value: toNano('0.1'),
         });
         expect(await sale.getAffilateTotal()).toEqual(toNano('0.1'));
         const referrerHelper = blockchain.openContract(
@@ -202,6 +201,60 @@ describe('Sale', () => {
         }
     });
 
+    it('should mint 100 NFTs at once with referrer', async () => {
+        blockchain.now = 1800000000;
+
+        let newSale = blockchain.openContract(
+            Sale.createFromConfig(
+                {
+                    adminPubkey: adminKeypair.publicKey,
+                    available: 300n,
+                    price: toNano('1'),
+                    lastIndex: 0n,
+                    collection: collection.address,
+                    buyerLimit: 300n,
+                    startTime: 1800000000n,
+                    endTime: 1900000000n,
+                    adminAddress: admin.address,
+                    helperCode,
+                    affilatePercentage: 100n,
+                },
+                code
+            )
+        );
+
+        await newSale.sendDeploy(admin.getSender(), toNano('0.05'));
+        await sale.sendChangeCollectionOwner(admin.getSender(), toNano('0.05'), newSale.address);
+
+        const signature = newSale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
+        const res = await newSale.sendPurchase(
+            users[0].getSender(),
+            toNano('1000'),
+            123n,
+            100n,
+            BigInt(blockchain.now),
+            signature,
+            users[1].address
+        );
+        expect(await collection.getNextItemIndex()).toEqual(100n);
+        for (let i = 0; i < 100; i++) {
+            const nft = blockchain.openContract(await collection.getNftItemByIndex(BigInt(i)));
+            expect(await nft.getOwner()).toEqualAddress(users[0].address);
+        }
+        expect(await newSale.getAffilateTotal()).toEqual(toNano('1'));
+        const referrerHelper = blockchain.openContract(
+            Helper.createFromConfig(
+                {
+                    sale: newSale.address,
+                    user: users[1].address,
+                    available: 300n,
+                },
+                helperCode
+            )
+        );
+        expect(await referrerHelper.getTotalAffilate()).toEqual(toNano('1'));
+    });
+
     it('should mint anywhere between 1 and 100 NFTs at once', async () => {
         blockchain.now = 1800000000;
 
@@ -245,7 +298,7 @@ describe('Sale', () => {
         expect(await collection.getNextItemIndex()).toEqual(5050n);
     });
 
-    it('should mint anywhere between 1 and 20 NFTs at once with referrer', async () => {
+    it('should mint anywhere between 1 and 100 NFTs at once with referrer', async () => {
         blockchain.now = 1800000000;
 
         let newSale = blockchain.openContract(
@@ -272,7 +325,7 @@ describe('Sale', () => {
 
         const signature = newSale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
 
-        for (let i = 1; i <= 20; i++) {
+        for (let i = 1; i <= 100; i++) {
             let before = (await blockchain.getContract(newSale.address)).balance;
             const result = await newSale.sendPurchase(
                 users[0].getSender(),
@@ -288,12 +341,12 @@ describe('Sale', () => {
             expect(result.transactions).toHaveTransaction({
                 from: newSale.address,
                 to: users[1].address,
-                value: (x: bigint | undefined) => (x ? x >= (BigInt(i) * toNano('1')) / 20n - toNano('0.03') : false),
+                value: (x: bigint | undefined) => (x ? x >= (BigInt(i) * toNano('1')) / 100n - toNano('0.03') : false),
             });
         }
 
-        expect(await collection.getNextItemIndex()).toEqual(210n);
-        expect(await newSale.getAffilateTotal()).toEqual(toNano('10.5'));
+        expect(await collection.getNextItemIndex()).toEqual(5050n);
+        expect(await newSale.getAffilateTotal()).toEqual(toNano('252.5'));
 
         const referrerHelper = blockchain.openContract(
             Helper.createFromConfig(
@@ -305,7 +358,7 @@ describe('Sale', () => {
                 helperCode
             )
         );
-        expect(await referrerHelper.getTotalAffilate()).toEqual(toNano('10.5'));
+        expect(await referrerHelper.getTotalAffilate()).toEqual(toNano('252.5'));
     });
 
     it('should not mint 101 NFTs at once', async () => {
@@ -573,7 +626,7 @@ describe('Sale', () => {
 
         let res = await sale.sendPurchase(
             users[0].getSender(),
-            toNano('6.199'),
+            toNano('6.204'),
             123n,
             3n,
             BigInt(blockchain.now),
@@ -584,7 +637,7 @@ describe('Sale', () => {
             exitCode: 703,
         });
 
-        await sale.sendPurchase(users[0].getSender(), toNano('6.2'), 123n, 3n, BigInt(blockchain.now), signature);
+        await sale.sendPurchase(users[0].getSender(), toNano('6.205'), 123n, 3n, BigInt(blockchain.now), signature);
         expect(await collection.getNextItemIndex()).toEqual(3n);
     });
 
@@ -594,7 +647,7 @@ describe('Sale', () => {
 
         let res = await sale.sendPurchase(
             users[0].getSender(),
-            toNano('6.199'),
+            toNano('6.204'),
             123n,
             3n,
             BigInt(blockchain.now),
@@ -608,7 +661,7 @@ describe('Sale', () => {
 
         res = await sale.sendPurchase(
             users[0].getSender(),
-            toNano('6.2'),
+            toNano('6.205'),
             123n,
             3n,
             BigInt(blockchain.now),
@@ -618,7 +671,7 @@ describe('Sale', () => {
         expect(res.transactions).toHaveTransaction({
             from: sale.address,
             to: users[1].address,
-            value: toNano('0.279'),
+            value: toNano('0.3'),
         });
         expect(await collection.getNextItemIndex()).toEqual(3n);
     });

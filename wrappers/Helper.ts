@@ -1,4 +1,4 @@
-import { Address, Cell, Contract, ContractProvider, beginCell, contractAddress } from 'ton-core';
+import { Address, Cell, Contract, ContractProvider, beginCell, contractAddress } from '@ton/core';
 
 export type HelperConfig = {
     sale: Address;
