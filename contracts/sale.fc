@@ -267,6 +267,11 @@ global slice sender;
         data::last_index = in_msg_body~load_uint(32);
     }
 
+    elseif (op == op::change_available) {
+        throw_unless(error::wrong_sender, equal_slices(sender, data::admin_address)); ;; Only admin can change the data::available
+        data::available = in_msg_body~load_uint(32);
+    }
+
     save_data();
 }
 
