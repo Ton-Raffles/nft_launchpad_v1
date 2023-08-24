@@ -1,4 +1,4 @@
-import { Blockchain, SandboxContract, Treasury, TreasuryContract, printTransactionFees } from '@ton/sandbox';
+import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { Cell, beginCell, toNano } from '@ton/core';
 import { Sale } from '../wrappers/Sale';
 import { NFTCollection } from '../wrappers/NFTCollection';
