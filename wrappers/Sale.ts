@@ -113,6 +113,22 @@ export class Sale implements Contract {
         });
     }
 
+    async sendDisable(provider: ContractProvider, via: Sender, value: bigint) {
+        await provider.internal(via, {
+            value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell().storeUint(0x34c02669, 32).endCell(),
+        });
+    }
+
+    async sendEnable(provider: ContractProvider, via: Sender, value: bigint) {
+        await provider.internal(via, {
+            value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell().storeUint(0x2e484313, 32).endCell(),
+        });
+    }
+
     async getAvailable(provider: ContractProvider): Promise<bigint> {
         const result = (await provider.get('get_contract_data', [])).stack;
         result.skip(1);

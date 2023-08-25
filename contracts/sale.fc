@@ -144,7 +144,9 @@ global slice sender;
     sender = cs~load_msg_addr();
     load_data();
 
-    throw_unless(error::inactive, data::active);
+    ifnot (equal_slices(sender, data::admin_address)) {
+        throw_unless(error::inactive, data::active);
+    }
 
     int op = in_msg_body~load_uint(32);
 
@@ -270,6 +272,16 @@ global slice sender;
     elseif (op == op::change_available) {
         throw_unless(error::wrong_sender, equal_slices(sender, data::admin_address)); ;; Only admin can change the data::available
         data::available = in_msg_body~load_uint(32);
+    }
+
+    elseif (op == op::disable) {
+        throw_unless(error::wrong_sender, equal_slices(sender, data::admin_address)); ;; Only admin can disable
+        data::active = 0;
+    }
+
+    elseif (op == op::enable) {
+        throw_unless(error::wrong_sender, equal_slices(sender, data::admin_address)); ;; Only admin can enable
+        data::active = -1;
     }
 
     save_data();

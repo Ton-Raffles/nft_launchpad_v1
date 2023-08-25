@@ -5,6 +5,8 @@ const int op::purchase_confirm = 0xdde87fe4;
 const int op::credit_affilate = 0x27e28b63;
 const int op::change_last_index = 0x27eb8974;
 const int op::change_available = 0x277b8f15;
+const int op::disable = 0x34c02669;
+const int op::enable = 0x2e484313;
 const int op::bounced = 0xffffffff;
 
 const int const::base_fees = 35000000;

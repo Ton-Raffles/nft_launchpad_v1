@@ -11,3 +11,5 @@ purchase_confirm#dde87fe4 query_id:uint64 quantity:uint16 user:MsgAddressInt ref
 credit_affilate#27e28b63 query_id:uint64 amount:Coins = InternalMsgBody;
 change_last_index#27eb8974 new:uint32 = InternalMsgBody;
 change_available#277b8f15 new:uint32 = InternalMsgBody;
+disable#34c02669 = InternalMsgBody;
+enable#2e484313 = InternalMsgBody;

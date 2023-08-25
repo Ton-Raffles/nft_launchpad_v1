@@ -757,6 +757,68 @@ describe('Sale', () => {
         expect(await sale.getAvailable()).toEqual(12345n);
     });
 
+    it('should disable and enable by admin', async () => {
+        let result = await sale.sendDisable(users[0].getSender(), toNano('0.05'));
+        expect(result.transactions).toHaveTransaction({
+            from: users[0].address,
+            to: sale.address,
+            exitCode: 702,
+        });
+
+        result = await sale.sendDisable(admin.getSender(), toNano('0.05'));
+        expect(result.transactions).toHaveTransaction({
+            from: admin.address,
+            to: sale.address,
+            success: true,
+        });
+        expect(await sale.getActive()).toBeFalsy();
+
+        result = await sale.sendDisable(users[0].getSender(), toNano('0.05'));
+        expect(result.transactions).toHaveTransaction({
+            from: users[0].address,
+            to: sale.address,
+            exitCode: 707,
+        });
+
+        result = await sale.sendDisable(admin.getSender(), toNano('0.05'));
+        expect(result.transactions).toHaveTransaction({
+            from: admin.address,
+            to: sale.address,
+            success: true,
+        });
+        expect(await sale.getActive()).toBeFalsy();
+
+        result = await sale.sendEnable(users[0].getSender(), toNano('0.05'));
+        expect(result.transactions).toHaveTransaction({
+            from: users[0].address,
+            to: sale.address,
+            exitCode: 707,
+        });
+
+        result = await sale.sendEnable(admin.getSender(), toNano('0.05'));
+        expect(result.transactions).toHaveTransaction({
+            from: admin.address,
+            to: sale.address,
+            success: true,
+        });
+        expect(await sale.getActive()).toBeTruthy();
+
+        result = await sale.sendDisable(users[0].getSender(), toNano('0.05'));
+        expect(result.transactions).toHaveTransaction({
+            from: users[0].address,
+            to: sale.address,
+            exitCode: 702,
+        });
+
+        result = await sale.sendDisable(admin.getSender(), toNano('0.05'));
+        expect(result.transactions).toHaveTransaction({
+            from: admin.address,
+            to: sale.address,
+            success: true,
+        });
+        expect(await sale.getActive()).toBeFalsy();
+    });
+
     it('should mint NFTs with correct content', async () => {
         blockchain.now = 1800000000;
         const signature = sale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
