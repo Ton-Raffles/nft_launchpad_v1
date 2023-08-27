@@ -284,6 +284,16 @@ global slice sender;
         data::active = -1;
     }
 
+    elseif (op == op::collect_remaining_balance) {
+        throw_unless(error::wrong_sender, equal_slices(sender, data::admin_address)); ;; Only admin can collect remaining balance
+        send_raw_message(begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(data::admin_address)
+            .store_coins(0)
+            .store_uint(0, 107)
+        .end_cell(), 128);
+    }
+
     save_data();
 }
 

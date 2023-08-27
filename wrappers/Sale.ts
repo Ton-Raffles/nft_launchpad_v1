@@ -129,6 +129,14 @@ export class Sale implements Contract {
         });
     }
 
+    async sendCollectRemainingBalance(provider: ContractProvider, via: Sender, value: bigint) {
+        await provider.internal(via, {
+            value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell().storeUint(0x4316d699, 32).endCell(),
+        });
+    }
+
     async getAvailable(provider: ContractProvider): Promise<bigint> {
         const result = (await provider.get('get_contract_data', [])).stack;
         result.skip(1);

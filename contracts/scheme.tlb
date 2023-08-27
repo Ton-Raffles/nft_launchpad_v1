@@ -13,3 +13,4 @@ change_last_index#27eb8974 new:uint32 = InternalMsgBody;
 change_available#277b8f15 new:uint32 = InternalMsgBody;
 disable#34c02669 = InternalMsgBody;
 enable#2e484313 = InternalMsgBody;
+collect_remaining_balance#4316d699 = InternalMsgBody;

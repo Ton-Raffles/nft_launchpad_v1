@@ -757,6 +757,23 @@ describe('Sale', () => {
         expect(await sale.getAvailable()).toEqual(12345n);
     });
 
+    it('should collect remaining balance by admin', async () => {
+        let result = await sale.sendCollectRemainingBalance(users[0].getSender(), toNano('0.05'));
+        expect(result.transactions).toHaveTransaction({
+            from: users[0].address,
+            to: sale.address,
+            exitCode: 702,
+        });
+
+        result = await sale.sendCollectRemainingBalance(admin.getSender(), toNano('0.05'));
+        expect(result.transactions).toHaveTransaction({
+            from: admin.address,
+            to: sale.address,
+            success: true,
+            value: (x) => (x || 0n) >= toNano('0.05'),
+        });
+    });
+
     it('should disable and enable by admin', async () => {
         let result = await sale.sendDisable(users[0].getSender(), toNano('0.05'));
         expect(result.transactions).toHaveTransaction({
