@@ -109,6 +109,46 @@ describe('Sale', () => {
         expect(await nft.getOwner()).toEqualAddress(users[0].address);
     });
 
+    it('should mint NFTs with price 0', async () => {
+        blockchain.now = 1800000000;
+
+        let newSale = blockchain.openContract(
+            Sale.createFromConfig(
+                {
+                    adminPubkey: adminKeypair.publicKey,
+                    available: 300n,
+                    price: 0n,
+                    lastIndex: 0n,
+                    collection: collection.address,
+                    buyerLimit: 300n,
+                    startTime: 1800000000n,
+                    endTime: 1900000000n,
+                    adminAddress: admin.address,
+                    helperCode,
+                },
+                code
+            )
+        );
+
+        await newSale.sendDeploy(admin.getSender(), toNano('0.05'));
+        await sale.sendChangeCollectionOwner(admin.getSender(), toNano('0.05'), newSale.address);
+
+        const signature = newSale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
+        const res = await newSale.sendPurchase(
+            users[0].getSender(),
+            toNano('4.085'),
+            123n,
+            100n,
+            BigInt(blockchain.now),
+            signature
+        );
+        expect(await collection.getNextItemIndex()).toEqual(100n);
+        for (let i = 0; i < 100; i++) {
+            const nft = blockchain.openContract(await collection.getNftItemByIndex(BigInt(i)));
+            expect(await nft.getOwner()).toEqualAddress(users[0].address);
+        }
+    });
+
     it('should mint one NFT with referrer', async () => {
         blockchain.now = 1800000000;
         const signature = sale.signPurchase(adminKeypair, users[0].address, BigInt(blockchain.now));
