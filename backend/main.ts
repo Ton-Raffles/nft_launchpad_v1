@@ -319,7 +319,14 @@ app.get('/sales/launch/:id', async (req, res) => {
 });
 
 app.post('/createCollection', authorizeAdmin, async (req, res) => {
-    const { ownerAddress, collectionContentUrl, collectionCommonContentUrl, royaltyBase, royaltyFactor } = req.body;
+    const {
+        ownerAddress,
+        collectionContentUrl,
+        collectionCommonContentUrl,
+        royaltyBase,
+        royaltyFactor,
+        royaltyAddress,
+    } = req.body;
 
     try {
         const collection = client.open(
@@ -331,6 +338,7 @@ app.post('/createCollection', authorizeAdmin, async (req, res) => {
                     itemCode: NFTItemCode,
                     royaltyFactor,
                     royaltyBase,
+                    royaltyAddress,
                 },
                 NFTCollectionCode
             )

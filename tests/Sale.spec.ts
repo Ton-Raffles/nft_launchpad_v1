@@ -44,6 +44,7 @@ describe('Sale', () => {
                     itemCode: codeNFTItem,
                     royaltyFactor: 1n,
                     royaltyBase: 1n,
+                    royaltyAddress: admin.address,
                 },
                 codeNFTCollection
             )

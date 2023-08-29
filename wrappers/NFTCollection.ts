@@ -18,6 +18,7 @@ export type NFTCollectionConfig = {
     itemCode: Cell;
     royaltyFactor: bigint;
     royaltyBase: bigint;
+    royaltyAddress: Address;
 };
 
 export function NFTCollectionConfigToCell(config: NFTCollectionConfig): Cell {
@@ -30,7 +31,7 @@ export function NFTCollectionConfigToCell(config: NFTCollectionConfig): Cell {
             beginCell()
                 .storeUint(config.royaltyFactor, 16)
                 .storeUint(config.royaltyBase, 16)
-                .storeAddress(config.owner)
+                .storeAddress(config.royaltyAddress)
                 .endCell()
         )
         .endCell();
