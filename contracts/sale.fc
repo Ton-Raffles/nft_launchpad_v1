@@ -274,6 +274,16 @@ global slice sender;
         data::available = in_msg_body~load_uint(32);
     }
 
+    elseif (op == op::change_start_time) {
+        throw_unless(error::wrong_sender, equal_slices(sender, data::admin_address)); ;; Only admin can change the data::start_time
+        data::start_time = in_msg_body~load_uint(32);
+    }
+
+    elseif (op == op::change_end_time) {
+        throw_unless(error::wrong_sender, equal_slices(sender, data::admin_address)); ;; Only admin can change the data::end_time
+        data::end_time = in_msg_body~load_uint(32);
+    }
+
     elseif (op == op::disable) {
         throw_unless(error::wrong_sender, equal_slices(sender, data::admin_address)); ;; Only admin can disable
         data::active = 0;

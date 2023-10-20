@@ -798,6 +798,40 @@ describe('Sale', () => {
         expect(await sale.getAvailable()).toEqual(12345n);
     });
 
+    it('should change the start time by admin', async () => {
+        let result = await sale.sendChangeStartTime(users[0].getSender(), toNano('0.05'), 12345n);
+        expect(result.transactions).toHaveTransaction({
+            from: users[0].address,
+            to: sale.address,
+            exitCode: 702,
+        });
+
+        result = await sale.sendChangeStartTime(admin.getSender(), toNano('0.05'), 12345n);
+        expect(result.transactions).toHaveTransaction({
+            from: admin.address,
+            to: sale.address,
+            success: true,
+        });
+        expect(await sale.getStartEndTime()).toEqual([12345, 1900000000]);
+    });
+
+    it('should change the end time by admin', async () => {
+        let result = await sale.sendChangeEndTime(users[0].getSender(), toNano('0.05'), 12345n);
+        expect(result.transactions).toHaveTransaction({
+            from: users[0].address,
+            to: sale.address,
+            exitCode: 702,
+        });
+
+        result = await sale.sendChangeEndTime(admin.getSender(), toNano('0.05'), 12345n);
+        expect(result.transactions).toHaveTransaction({
+            from: admin.address,
+            to: sale.address,
+            success: true,
+        });
+        expect(await sale.getStartEndTime()).toEqual([1800000000, 12345]);
+    });
+
     it('should collect remaining balance by admin', async () => {
         let result = await sale.sendCollectRemainingBalance(users[0].getSender(), toNano('0.05'));
         expect(result.transactions).toHaveTransaction({
