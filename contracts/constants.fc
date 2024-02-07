@@ -1,5 +1,5 @@
 const int op::purchase = 0x503a1f4;
-const int op::change_collection_owner = 0x49a4bbf6;
+const int op::change_collection_owner = 0x4afc346e;
 const int op::purchase_check = 0x26ae3cf9;
 const int op::purchase_confirm = 0xdde87fe4;
 const int op::credit_affilate = 0x27e28b63;

@@ -5,7 +5,7 @@ _ admin_pubkey:uint256 available:uint32 price:Coins last_index:uint32 collection
 _ sale:MsgAddressInt user:MsgAddressInt available:uint32 total_affilate:Coins = HelperStorage;
 
 purchase#503a1f4 query_id:uint64 quantity:uint16 time:uint64 signature:bits512 referrer:(Maybe MsgAddressInt) = InternalMsgBody;
-change_collection_owner#49a4bbf6 new_owner:MsgAddressInt = InternalMsgBody;
+change_collection_owner#4afc346e new_owner:MsgAddressInt collection:Maybe MsgAddressInt = InternalMsgBody;
 purchase_check#26ae3cf9 query_id:uint64 quantity:uint16 referrer:(Maybe MsgAddressInt) = InternalMsgBody;
 purchase_confirm#dde87fe4 query_id:uint64 quantity:uint16 user:MsgAddressInt referrer:(Maybe MsgAddressInt) = InternalMsgBody;
 credit_affilate#27e28b63 query_id:uint64 amount:Coins = InternalMsgBody;

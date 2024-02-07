@@ -1,4 +1,14 @@
-import { Address, beginCell, Cell, Contract, contractAddress, ContractProvider, Sender, SendMode } from '@ton/core';
+import {
+    Address,
+    beginCell,
+    Builder,
+    Cell,
+    Contract,
+    contractAddress,
+    ContractProvider,
+    Sender,
+    SendMode,
+} from '@ton/core';
 import { KeyPair, sign } from '@ton/crypto';
 
 export type SaleConfig = {
@@ -89,11 +99,23 @@ export class Sale implements Contract {
         });
     }
 
-    async sendChangeCollectionOwner(provider: ContractProvider, via: Sender, value: bigint, newOwner: Address) {
+    async sendChangeCollectionOwner(
+        provider: ContractProvider,
+        via: Sender,
+        value: bigint,
+        newOwner: Address,
+        collection?: Address
+    ) {
+        let b = beginCell().storeUint(0x4afc346e, 32).storeAddress(newOwner);
+        if (collection) {
+            b.storeUint(1, 1).storeAddress(collection);
+        } else {
+            b.storeUint(0, 1);
+        }
         await provider.internal(via, {
             value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
-            body: beginCell().storeUint(0x49a4bbf6, 32).storeAddress(newOwner).endCell(),
+            body: b.endCell(),
         });
     }
 

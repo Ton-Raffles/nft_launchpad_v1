@@ -252,9 +252,10 @@ global slice sender;
     elseif (op == op::change_collection_owner) {
         throw_unless(error::wrong_sender, equal_slices(sender, data::admin_address)); ;; Only admin can change the data::collection owner
         slice new_owner = in_msg_body~load_msg_addr();
+        slice collection = in_msg_body~load_int(1) ? in_msg_body~load_msg_addr() : data::collection;
         send_raw_message(begin_cell()
             .store_uint(0x18, 6)
-            .store_slice(data::collection)
+            .store_slice(collection)
             .store_coins(0)
             .store_uint(0, 107)
             .store_uint(3, 32)

@@ -6,6 +6,7 @@ import '@ton/test-utils';
 import { compile } from '@ton/blueprint';
 import { KeyPair, getSecureRandomBytes, keyPairFromSeed } from '@ton/crypto';
 import { Helper } from '../wrappers/Helper';
+import { randomAddress } from '@ton/test-utils';
 
 describe('Sale', () => {
     let code: Cell;
@@ -762,6 +763,17 @@ describe('Sale', () => {
             success: false,
             exitCode: 707,
         });
+    });
+
+    it('should change the owner of collection and set inactive (with arbitrary collection address)', async () => {
+        const addr = randomAddress();
+        let result = await sale.sendChangeCollectionOwner(admin.getSender(), toNano('0.05'), users[0].address, addr);
+        expect(result.transactions).toHaveTransaction({
+            from: sale.address,
+            to: addr,
+            op: 3,
+        });
+        expect(await collection.getOwner()).toEqualAddress(sale.address);
     });
 
     it('should change the last index value by admin', async () => {
